@@ -7,6 +7,7 @@ fn @is_x86() -> bool { true }
 fn @is_sse() -> bool { true }
 fn @is_avx() -> bool { true }
 fn @is_avx2() -> bool { false }
+fn @is_hls() -> bool { false }
 
 fn @get_vector_length() -> i32 { 8 }
 fn @get_alignment() -> i32 { 32 }
