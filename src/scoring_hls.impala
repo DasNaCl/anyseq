@@ -1,0 +1,79 @@
+fn get_linmem_iteration_acc_device(column: Vector, row: Vector, corners: Vector) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
+    // TODO
+    print_string("get_linmem_iteration_acc_device");
+    |offset_i, offset_j, height, width, _, it| -> ScoringMatrixAcc{
+        ScoringMatrixAcc{
+            read_no_gap:       |_, _| { 61 },
+            read_gap_q:        |_, _| { 62 },
+            read_gap_s:        |_, j| { 63 },
+            write:             |_, j, score| {
+            },
+            update_begin_line: |i| {
+            },
+            update_end_line:   |i| {
+            },
+            block_end:         || {}
+        }
+    }
+}
+
+fn get_local_max_vector_size_device(matrix_width: Index) -> Index { round_up_div(matrix_width, BLOCK_WIDTH) }
+
+fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores: Vector, max_pos_i: Vector, max_pos_j: Vector) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
+    // TODO
+    print_string("get_local_linmem_iteration_acc_device");
+    |offset_i, offset_j, height, width, is_left_half, it| {
+        ScoringMatrixAcc{
+            read_no_gap:       |_, _| { 71 },
+            read_gap_q:        |_, _| { 72 },
+            read_gap_s:        |_, j| { 73 },
+            write:             |_, j, score| {
+            },
+            update_begin_line: |i| {
+            },
+            update_end_line:   |i| {
+            },
+            block_end:         || {}
+        }
+    }
+}
+
+fn get_iteration_acc_hb_device(column_left: Vector, column_right: Vector, row: Vector, corners: Vector, block_width: Index) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
+    // TODO
+    print_string("get_iteration_acc_hb_device");
+    |offset_i, offset_j, height, width, is_left_half, it| -> ScoringMatrixAcc{
+        ScoringMatrixAcc{
+            read_no_gap:       |_, _| { 61 },
+            read_gap_q:        |_, _| { 62 },
+            read_gap_s:        |_, j| { 63 },
+            write:             |_, j, score| {
+            },
+            update_begin_line: |i| {
+            },
+            update_end_line:   |i| {
+            },
+            block_end:         || {}
+        }
+    }
+}
+
+fn get_iteration_acc_tb_device(block_width: Index, init_scores: InitScoresFn) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
+    // TODO
+    print_string("get_iteration_acc_tb_device");
+    |offset_i, offset_j, _, width, _, it| -> ScoringMatrixAcc{
+        ScoringMatrixAcc{
+            read_no_gap:       |_, _| { 61 },
+            read_gap_q:        |_, _| { 62 },
+            read_gap_s:        |_, j| { 63 },
+            write:             |_, j, score| {
+            },
+            update_begin_line: |i| {
+            },
+            update_end_line:   |i| {
+            },
+            block_end:         || {}
+        }
+    }
+
+}
+

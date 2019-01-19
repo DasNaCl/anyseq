@@ -7,35 +7,65 @@ find_package(AnyDSL_runtime REQUIRED)
 include_directories(${AnyDSL_runtime_INCLUDE_DIRS})
 set(ANYDSL_RUNTIME_LIBRARIES ${AnyDSL_runtime_LIBRARIES})
 
-set(BACKEND ${BACKEND} CACHE STRING "select the backend from the following: CPU, AVX, NVVM, CUDA, OPENCL")
+set(BACKEND ${BACKEND} CACHE STRING "select the backend from the following: CPU, AVX, NVVM, CUDA, OPENCL, HLS")
 if(NOT BACKEND)
-    set(BACKEND cpu CACHE STRING "select the backend from the following: CPU, AVX, NVVM, CUDA, OPENCL" FORCE)
+    set(BACKEND cpu CACHE STRING "select the backend from the following: CPU, AVX, NVVM, CUDA, OPENCL, HLS" FORCE)
 endif()
 string(TOLOWER "${BACKEND}" BACKEND)
 message(STATUS "Selected backend: ${BACKEND}")
+if(BACKEND STREQUAL "hls")
+    if(NOT HLS_PART)
+        set(HLS_PART xc7z020clg484-1 CACHE STRING "select the hardware the high level synthesis should use." FORCE)
+    endif()
+    string(TOLOWER "${HLS_PART}" HLS_PART)
+    message(STATUS "Selected hls part: ${HLS_PART}")
+else()
+    unset(HLS_PART CACHE)
+endif()
 
 set(BACKEND_FILE src/backend/backend_${BACKEND}.impala)
 
 if(BACKEND STREQUAL "cpu" OR BACKEND STREQUAL "avx")
     set(DEVICE "cpu")
 else()
-    set(DEVICE "acc")
+    if(BACKEND STREQUAL "hls")
+        set(DEVICE "fpga")
+    else()
+        set(DEVICE "acc")
+    endif()
 endif()
 
-anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
-    ${BACKEND_FILE} 
-    src/align.impala
-    src/dynprog.impala 
-    src/export.impala
-    src/iteration_${DEVICE}.impala 
-    src/mapping_${DEVICE}.impala 
-    src/predecessors.impala 
-    src/scoring.impala 
-    src/scoring_${DEVICE}.impala 
-    src/traceback.impala 
-    src/traceback_lintime.impala 
-    src/utils.impala
-    ) 
+if(BACKEND STREQUAL "hls")
+  anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
+      ${BACKEND_FILE} 
+      src/align.impala
+      src/dynprog.impala 
+      src/export.impala
+      src/iteration_hls.impala # 
+      src/mapping_fpga.impala   #
+      src/predecessors.impala 
+      src/scoring.impala 
+      src/scoring_hls.impala   #
+      src/traceback.impala 
+      src/traceback_lintime.impala 
+      src/utils.impala
+      ) 
+else()
+  anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
+      ${BACKEND_FILE} 
+      src/align.impala
+      src/dynprog.impala 
+      src/export.impala
+      src/iteration_${DEVICE}.impala 
+      src/mapping_${DEVICE}.impala 
+      src/predecessors.impala 
+      src/scoring.impala 
+      src/scoring_${DEVICE}.impala 
+      src/traceback.impala 
+      src/traceback_lintime.impala 
+      src/utils.impala
+      ) 
+endif()
 
 add_executable(align 
     src/main.cpp 

@@ -1,0 +1,84 @@
+static BLOCK_WIDTH = 1;
+static BLOCK_HEIGHT = 1;
+
+struct IterationInfo {
+    block_id: Index
+}
+
+fn create_iteration_info(block_id: Index) -> IterationInfo {
+    IterationInfo{
+        block_id: block_id
+    }
+}
+
+fn iteration(query: Sequence, subject: Sequence, scores: ScoringMatrix, predc: PredecessorMatrix, body: RelaxationBody) -> ()
+{
+    // TODO
+    print_string("iteration");
+
+    let acc = accelerator(device_id);
+    for work_item in acc.exec((1,1,1), (1,1,1))
+    {
+        let que_acc = get_sequence_acc_offset(read_sequence_cpu(query),
+                                              write_sequence_cpu(query),
+                                              0);
+        let sub_acc = get_sequence_acc_offset(read_sequence_cpu(subject),
+                                              write_sequence_cpu(subject),
+                                              0);
+        let sco_acc = scores.get_iteration_acc(0, 0, 1, 1, false, create_iteration_info(0));
+        // Not needed, we don't do any traceback on the fpga!
+        let pre_acc = predc.get_iteration_acc(0, 0, 1, 1, create_iteration_info(0));
+        @@body(0, 0, que_acc, sub_acc, sco_acc, pre_acc);
+    }
+}
+
+fn iteration_partitioned(half_size: Index, num_halfs: Index, block_width: Index, splits: Splits, max_part_height: Index) -> IterationFn{
+    // Traceback is not supported on the fpga
+    |query, subject, scores, predc, body| {
+    }
+}
+
+fn iteration_blockwise(block_width: Index, splits: Splits) -> IterationFn {
+    // Traceback is not supported on the fpga
+    |query, subject, scores, predc, body| {
+    }
+}
+
+fn iteration_tb(predc: MatrixS, splits: Splits, subject_length: Index, block_width: Index, body: fn (MatrixSAcc, Index, Index, Index, Index) -> ()) -> (){
+    // Traceback is not supported on the fpga
+}
+
+
+fn iteration_1d(length: Index, body: fn(Index) -> ()) -> (){
+    // TODO
+    print_string("iteration_1d")
+}
+
+fn iteration_matrix_1d(matrix: Matrix, length: Index, body: fn(Index, MatrixAcc) -> ()) -> (){
+    // TODO
+    print_string("iteration_matrix_1d")
+}
+
+fn iteration_matrix_s_1d(matrix: MatrixS, length: Index, body: fn(Index, MatrixSAcc) -> ()) -> (){
+    // TODO
+    print_string("iteration_matrix_s_1d")
+}
+
+
+fn iteration_vector_1d(vector: Vector, length: Index, body: fn(Index, VectorAcc) -> ()) -> (){
+    // TODO
+    print_string("iteration_vector_1d")
+}
+    
+
+fn iteration_2_vectors_1d(vector_1: Vector, vector_2: Vector, length: Index, body: fn(Index, VectorAcc, VectorAcc) -> ()) -> (){
+    // TODO
+    print_string("iteration_2_vectors_1d")
+}
+
+fn iteration_reduction(vector: Vector, index_vec: Vector, score_vec: Vector, offset: Index, length: Index, body: fn(Score, Score) -> bool) -> (){
+    // TODO
+    print_string("iteration_reduction")
+}
+
+

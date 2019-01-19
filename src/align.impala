@@ -172,6 +172,7 @@ fn affine_scoring_scheme(same: Score, diff: Score,
 fn relax(query: Sequence, subject: Sequence, scoring: ScoringMatrix, predecessors: PredecessorMatrix, scheme: AlignmentScheme, iter: IterationFn) -> (){
 
     for i, j, que_acc, sub_acc, sco_acc, pre_acc in iter(query, subject, scoring, predecessors) {
+        pragma_pipeline();
         
         let sym_q = que_acc.read(i);
         let sym_s = sub_acc.read(j);
