@@ -35,37 +35,24 @@ else()
     endif()
 endif()
 
-if(BACKEND STREQUAL "hls")
-  anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
-      ${BACKEND_FILE} 
-      src/align.impala
-      src/dynprog.impala 
-      src/export.impala
-      src/iteration_hls.impala # 
-      src/mapping_fpga.impala   #
-      src/predecessors.impala 
-      src/scoring.impala 
-      src/scoring_hls.impala   #
-      src/traceback.impala 
-      src/traceback_lintime.impala 
-      src/utils.impala
-      ) 
+if(DEVICE STREQUAL "fpga")
+    set(DEVICE_FILES src/sysarr.impala src/iteration_hls.impala src/scoring_hls.impala src/mapping_fpga.impala)
 else()
-  anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
-      ${BACKEND_FILE} 
-      src/align.impala
-      src/dynprog.impala 
-      src/export.impala
-      src/iteration_${DEVICE}.impala 
-      src/mapping_${DEVICE}.impala 
-      src/predecessors.impala 
-      src/scoring.impala 
-      src/scoring_${DEVICE}.impala 
-      src/traceback.impala 
-      src/traceback_lintime.impala 
-      src/utils.impala
-      ) 
+    set(DEVICE_FILES src/iteration_${DEVICE}.impala src/mapping_${DEVICE}.impala src/scoring_${DEVICE}.impala)
 endif()
+
+anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
+    ${BACKEND_FILE} 
+    src/align.impala
+    src/dynprog.impala 
+    src/export.impala
+    ${DEVICE_FILES}
+    src/predecessors.impala 
+    src/scoring.impala 
+    src/traceback.impala 
+    src/traceback_lintime.impala 
+    src/utils.impala
+    ) 
 
 add_executable(align 
     src/main.cpp 

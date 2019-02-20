@@ -8,9 +8,8 @@ type GapFn   = fn (Symbol, Symbol) -> Score;
 
 type RelaxationFn   = fn (Symbol, Symbol, Score, Score, Score) -> (Score, Predecessor);
 type ScoringFn      = fn (Index, Index, AlignmentScheme) -> Scoring;
-type RelaxationBody = fn (Index, Index, SequenceAcc, SequenceAcc, ScoringMatrixAcc, PredecessorMatrixAcc) -> ();
-type IterationFn    = fn (Sequence, Sequence, ScoringMatrix, PredecessorMatrix, RelaxationBody) -> ();
-type InitScoresFn   = fn (Index) -> Score;
+type RelaxationBody = fn (Index, Index, SequenceAcc, SequenceAcc, ScoringMatrixAcc, PredecessorMatrixAcc, RelaxationFn) -> ();
+type IterationFn    = fn (Sequence, Sequence, ScoringMatrix, PredecessorMatrix, AlignmentScheme, RelaxationBody) -> ();
 type InitPredcFn    = fn (Index) -> Predecessor;
 
 static SCORE_MIN_VALUE = -2147483647;
@@ -18,7 +17,7 @@ static SCORE_MIN_VALUE = -2147483647;
 static MIN_PART_WIDTH_HB = 128;
 
 struct AlignmentScheme {
-    init_scores:     InitScoresFn,
+    init_scores:     InitScoresAcc,
     init_predc_rows: InitPredcFn,
     init_predc_cols: InitPredcFn,
     get_scoring:     ScoringFn,
@@ -82,12 +81,15 @@ fn relax_local(q: Symbol, s: Symbol, no_gap_entry: Score, gap_q_entry: Score, ga
 //-------------------------------------------------------------------
 // matrix initialization
 //-------------------------------------------------------------------
-fn init_scores_global(gap: GapFn) -> InitScoresFn { |i| { (i + 1) * gap(0 as u8, 0 as u8) } }
-fn init_scores_local(i: Index) -> Score { 0 }
+fn @init_scores_global(sc: ScoringScheme) -> InitScoresAcc {
+    get_init_scores_acc(|i| { (i + 1) * sc.gaps(0 as u8, 0 as u8) },
+                        |_,_|(), sc)
+}
+fn @init_scores_local(sc: ScoringScheme) -> InitScoresAcc { get_init_scores_acc(|_| { 0 }, |_,_|(), sc) }
 
-fn init_predc_global_rows(i: Index) -> Predecessor { if i == -1 { PRED_NONE } else { PRED_GAP_S } }
-fn init_predc_global_cols(i: Index) -> Predecessor { if i == -1 { PRED_NONE } else { PRED_GAP_Q } }
-fn init_predc_local(i: Index) -> Predecessor { PRED_NONE }
+fn @(?i)init_predc_global_rows(i: Index) -> Predecessor { if i == -1 { PRED_NONE } else { PRED_GAP_S } }
+fn @(?i)init_predc_global_cols(i: Index) -> Predecessor { if i == -1 { PRED_NONE } else { PRED_GAP_Q } }
+fn @init_predc_local(i: Index) -> Predecessor { PRED_NONE }
 
 
 //-------------------------------------------------------------------
@@ -95,7 +97,7 @@ fn init_predc_local(i: Index) -> Predecessor { PRED_NONE }
 //-------------------------------------------------------------------
 fn global_scheme(scoring: ScoringScheme) -> AlignmentScheme {
     AlignmentScheme {
-        init_scores:     init_scores_global(scoring.gaps),
+        init_scores:     init_scores_global(scoring),
         init_predc_rows: init_predc_global_rows,
         init_predc_cols: init_predc_global_cols,
         get_scoring:     get_global_scoring_linmem,
@@ -105,7 +107,7 @@ fn global_scheme(scoring: ScoringScheme) -> AlignmentScheme {
 
 fn semiglobal_scheme(scoring: ScoringScheme) -> AlignmentScheme {
     AlignmentScheme {
-        init_scores:     init_scores_local,
+        init_scores:     init_scores_local(scoring),
         init_predc_rows: init_predc_local,
         init_predc_cols: init_predc_local,
         get_scoring:     get_semiglobal_scoring_linmem,
@@ -115,7 +117,7 @@ fn semiglobal_scheme(scoring: ScoringScheme) -> AlignmentScheme {
 
 fn local_scheme(scoring: ScoringScheme) -> AlignmentScheme {
     AlignmentScheme {
-        init_scores:     init_scores_local,
+        init_scores:     init_scores_local(scoring),
         init_predc_rows: init_predc_local,
         init_predc_cols: init_predc_local,
         get_scoring:     get_local_scoring_linmem,
@@ -171,9 +173,7 @@ fn affine_scoring_scheme(same: Score, diff: Score,
 //-------------------------------------------------------------------
 fn relax(query: Sequence, subject: Sequence, scoring: ScoringMatrix, predecessors: PredecessorMatrix, scheme: AlignmentScheme, iter: IterationFn) -> (){
 
-    for i, j, que_acc, sub_acc, sco_acc, pre_acc in iter(query, subject, scoring, predecessors) {
-        pragma_pipeline();
-        
+    for i, j, que_acc, sub_acc, sco_acc, pre_acc, relax_fn in iter(query, subject, scoring, predecessors, scheme) {
         let sym_q = que_acc.read(i);
         let sym_s = sub_acc.read(j);
 
@@ -181,7 +181,8 @@ fn relax(query: Sequence, subject: Sequence, scoring: ScoringMatrix, predecessor
         let gap_q_entry  = sco_acc.read_gap_q (i, j);
         let gap_s_entry  = sco_acc.read_gap_s (i, j);
 
-        let (score, predc) = scheme.relax(sym_q, sym_s, no_gap_entry, gap_q_entry, gap_s_entry);
+    print_pragma("#pragma right before relax");
+        let (score, predc) = @@(relax_fn)(sym_q, sym_s, no_gap_entry, gap_q_entry, gap_s_entry);
         
         sco_acc.write(i, j, score);
         pre_acc.write(i, j, predc);
