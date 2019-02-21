@@ -1,32 +1,40 @@
 
+static READ_TOP_ROW_FLAG     = 1 << 0;
+
 struct InitScoresAcc {
   read:  fn(Index) -> Score,
   write: fn(Index, Score) -> (),
+
+  read_top_row:      fn(Index) -> Score,
+  write_top_row:     fn(Index, Score) -> (),
+
   matches: MatchFn
 }
 fn @get_init_scores_acc(read: fn(Index) -> Score, write: fn(Index, Score) -> (), sc: ScoringScheme) -> InitScoresAcc{
     // we trick a bit by ignoring the argument functions (the PS provides init scores to PL, which we aren't modeling)
     let acc = accelerator(device_id);
-    let olddatabuffer = acc.alloc(5 * sizeof[Score]());
+    let left_column = acc.alloc(5 * sizeof[Score]());
+    let top_row = acc.alloc(7 * sizeof[Score]());
     
     InitScoresAcc{
-      read:  |i|   bitcast[&[1][Score]](olddatabuffer.data)(i),
-      write: |i,v| bitcast[&mut[1][Score]](olddatabuffer.data)(i) = v,
+      read:  |i|   bitcast[&[1][Score]](left_column.data)(i),
+      write: |i,v| bitcast[&mut[1][Score]](left_column.data)(i) = v,
+
+      read_top_row:      |i|   bitcast[&[1][Score]](top_row.data)(i),
+      write_top_row:     |i,v| bitcast[&mut[1][Score]](top_row.data)(i) = v,
+
       matches: sc.matches
     }
 }
 fn @get_global_scoring_linmem(height: Index, width: Index, scheme: AlignmentScheme) -> Scoring{
-    let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores);
-
-    let get_score =     || { 42 as Score }; // <- unsupported
-    let get_score_pos = || (height - 1, width - 1); // <- unsupported
-
-    create_scoring(score_matrix, get_score, get_score_pos)
+    let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores,
+                                                    READ_TOP_ROW_FLAG);
+    create_scoring(score_matrix, || undef[Score](), || undef[(Index, Index)]())
 }
 
 fn @get_semiglobal_scoring_linmem(height: Index, width: Index, scheme: AlignmentScheme) -> Scoring{
     // the last row corresponds to the state a pe i is in after `subject_len + i` steps
-    // the last column corresponds to the stuff that was written to olddatabuffer (aka init_scores)
+    // the last column corresponds to the stuff that was written to left_column (aka init_scores)
     // We might be able to find the store using this information.
 
     // TODO
@@ -55,7 +63,7 @@ fn @create_maximums_array(size: i32) -> MaximumsArray{
 }
 
 fn @get_local_scoring_linmem(height: Index, width: Index, scheme: AlignmentScheme) -> Scoring{
-    let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores);
+    let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores, 0);
     
     // now, our PEs need to keep track over maximum values as well
     let maxs = create_maximums_array(PE_COUNT);
@@ -68,13 +76,11 @@ fn @get_local_scoring_linmem(height: Index, width: Index, scheme: AlignmentSchem
         get_right_half_column: score_matrix.get_last_column,
         release:               score_matrix.release
     };
-    let get_score = @|| { 42 as Score }; // <- unsupported
-    let get_score_pos = @|| { undef[(Index, Index)]() }; // <- unsupported
 
     Scoring{
         get_scoring_matrix:   || local_score_matrix,
-        get_score:               get_score,
-        get_score_pos:           get_score_pos,
+        get_score:            || undef[Score](),
+        get_score_pos:        || undef[(Index, Index)](),
         get_left_half_scores:    local_score_matrix.get_last_column,
         get_right_half_scores:   local_score_matrix.get_right_half_column,
         release:              || ()
@@ -123,18 +129,25 @@ fn @create_scoring_array(size: i32) -> ScoringArray {
   }
 }
 
-fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScoresAcc) -> ScoringMatrix{
+fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScoresAcc, @read_mask: i32) -> ScoringMatrix{
     let pe_scoring = create_scoring_array(PE_COUNT);
-    let mut cur = olddata.read(0);
-    let mut next = 0;
-    for pe in range(0, PE_COUNT) {
-        next = olddata.read(pe + 1);
+    
+    if(read_mask & READ_TOP_ROW_FLAG == READ_TOP_ROW_FLAG) {
+      let mut top_cur = olddata.read_top_row(0);
+      for pe in range(0, PE_COUNT) {
+        pe_scoring.write_hi_1j_old(pe, 0 as Score);
 
-        pe_scoring.write_hi_1j_1_old(pe, cur);
-        pe_scoring.write_hij_1_old(pe, cur);
-        pe_scoring.write_hi_1j_old(pe, next);
-
-        cur = next;
+        let top_next = olddata.read_top_row(pe + 1);
+        pe_scoring.write_hi_1j_1_old(pe, top_cur);
+        pe_scoring.write_hij_1_old(pe, top_next);
+        top_cur = top_next;
+      }
+    } else {
+      for pe in range(0, PE_COUNT) {
+        pe_scoring.write_hi_1j_old(pe, 0 as Score);
+        pe_scoring.write_hi_1j_1_old(pe, 0 as Score);
+        pe_scoring.write_hij_1_old(pe, 0 as Score);
+      }
     }
     ScoringMatrix{
         get_iteration_acc:        get_linmem_iteration_acc_device(pe_scoring, olddata),
@@ -221,10 +234,11 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                       pe_line.write_degenerate(pe, 1 as i8);
                     }
                     pe_line.write_ihi_1j(pe,   0 as Score);
-                    
+                   /* 
                     pe_line.write_hi_1j_old(pe,   0 as Score);
                     pe_line.write_hij_1_old(pe,   0 as Score);
                     pe_line.write_hi_1j_1_old(pe, 0 as Score);
+*/
                 }
             },
             block_end:         || {
