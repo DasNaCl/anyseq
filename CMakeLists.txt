@@ -19,8 +19,16 @@ if(BACKEND STREQUAL "hls")
     endif()
     string(TOLOWER "${HLS_PART}" HLS_PART)
     message(STATUS "Selected hls part: ${HLS_PART}")
+
+    if(NOT ALIGN_SCHEME)
+        set(ALIGN_SCHEME local CACHE STRING "select the alignment scheme for the specialized hardware." FORCE)
+        set_property(CACHE ALIGN_SCHEME PROPERTY STRINGS local global semiglobal)
+    endif()
+    string(TOLOWER "${ALIGN_SCHEME}" ALIGN_SCHEME)
+    message(STATUS "Selected scheme: ${ALIGN_SCHEME}")
 else()
     unset(HLS_PART CACHE)
+    unset(ALIGN_SCHEME CACHE)
 endif()
 
 set(BACKEND_FILE src/backend/backend_${BACKEND}.impala)
@@ -37,15 +45,17 @@ endif()
 
 if(DEVICE STREQUAL "fpga")
     set(DEVICE_FILES src/sysarr.impala src/iteration_hls.impala src/scoring_hls.impala src/mapping_fpga.impala)
+    set(EXPORT_FILE src/export_hls_${ALIGN_SCHEME}.impala)
 else()
     set(DEVICE_FILES src/iteration_${DEVICE}.impala src/mapping_${DEVICE}.impala src/scoring_${DEVICE}.impala)
+    set(EXPORT_FILE src/export.impala)
 endif()
 
 anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES 
     ${BACKEND_FILE} 
+    ${EXPORT_FILE}
     src/align.impala
     src/dynprog.impala 
-    src/export.impala
     ${DEVICE_FILES}
     src/predecessors.impala 
     src/scoring.impala 

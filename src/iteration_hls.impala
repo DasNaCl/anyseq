@@ -73,7 +73,6 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
                 iai.write(0, 4 as Score);
                 sco_acc.update_begin_line(1, i);
             }
-            print_pragma("#pragma right before systolic1");
             /// systolic1
             for pe in unroll_rev(PE_COUNT - 1, -1) {
                 let _iai = iai.read(pe) as SequenceElem;
@@ -83,12 +82,11 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
                 @@(body)(pe, i, que_acc, get_sequence_acc(iai_reader(), |_,_|()),
                          sco_acc, pre_acc, scheme.relax);
 
-                sco_acc.update_write(pe, _iai as Index);
                 if(pe + 1 < PE_COUNT) {
+                    sco_acc.update_write(pe);
                     iai.write(pe + 1, _iai as Score);
                 }
             }
-            print_pragma("#pragma right after systolic1");
             if(i >= PE_COUNT - 1) {
                 sco_acc.update_end_line(bufoff);
                 bufoff = bufoff + 1;
@@ -100,344 +98,58 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
 }
 
 fn iteration_partitioned(half_size: Index, num_halfs: Index, block_width: Index, splits: Splits, max_part_height: Index) -> IterationFn{
-    print_string("traceback is unsupported for HLS");
-    |query, subject, scores, predc, _, body| {
-    }
+    print_string("UNSUPPORTED: iteration_partitioned");
+
+    undef[IterationFn]()
 }
 
 fn iteration_blockwise(block_width: Index, splits: Splits) -> IterationFn {
-    print_string("traceback is unsupported for HLS");
-    |query, subject, scores, predc, _, body| {
-    }
+    print_string("UNSUPPORTED: iteration_blockwise");
+
+    undef[IterationFn]()
 }
 
 fn iteration_tb(predc: MatrixS, splits: Splits, subject_length: Index, block_width: Index, body: fn (MatrixSAcc, Index, Index, Index, Index) -> ()) -> (){
-    print_string("traceback is unsupported for HLS");
+    print_string("UNSUPPORTED: iteration_tb");
+
+    undef[()]()
 }
 
 
 fn iteration_1d(length: Index, body: fn(Index) -> ()) -> (){
-    // TODO
-    print_string("iteration_1d")
+    print_string("UNSUPPORTED: iteration_1d");
+
+    undef[()]()
 }
 
 fn iteration_matrix_1d(matrix: Matrix, length: Index, body: fn(Index, MatrixAcc) -> ()) -> (){
-    // TODO
-    print_string("iteration_matrix_1d")
+    print_string("UNSUPPORTED: iteration_matrix_1d");
+
+    undef[()]()
 }
 
 fn iteration_matrix_s_1d(matrix: MatrixS, length: Index, body: fn(Index, MatrixSAcc) -> ()) -> (){
-    // TODO
-    print_string("iteration_matrix_s_1d")
+    print_string("UNSUPPORTED: iteration_matrix_s_1d");
+
+    undef[()]()
 }
 
 
 fn iteration_vector_1d(vector: Vector, length: Index, body: fn(Index, VectorAcc) -> ()) -> (){
-    // TODO
-    print_string("iteration_vector_1d")
+    print_string("UNSUPPORTED: iteration_vector_1d");
+
+    undef[()]()
 }
     
 
 fn iteration_2_vectors_1d(vector_1: Vector, vector_2: Vector, length: Index, body: fn(Index, VectorAcc, VectorAcc) -> ()) -> (){
-    // TODO
-    print_string("iteration_2_vectors_1d")
+    print_string("UNSUPPORTED: iteration_2_vectors_1d");
+
+    undef[()]()
 }
 
 fn iteration_reduction(vector: Vector, index_vec: Vector, score_vec: Vector, offset: Index, length: Index, body: fn(Score, Score) -> bool) -> (){
-    // TODO
-    print_string("iteration_reduction")
+    print_string("UNSUPPORTED: iteration_reduction");
+
+    undef[()]()
 }
-
-
-/*
-struct RegisterArray {
-  // Inputs
-  get_iai: fn(Index) -> SequenceElem,
-  get_ihi_1j: fn(Index) -> Score,
-  get_imaxi_1j: fn(Index) -> Score,
-
-  write_iai: fn(Index, SequenceElem) -> (),
-  write_ihi_1j: fn(Index, Score) -> (),
-  write_imaxi_1j: fn(Index, Score) -> (),
-
-  // Score
-  get_hi_1j_old: fn(Index) -> Score,
-  get_hi_1j_1_old: fn(Index) -> Score,
-  get_hij_1_old: fn(Index) -> Score,
-  get_maxij_old: fn(Index) -> Score,
-
-  write_hi_1j_old: fn(Index, Score) -> (),
-  write_hi_1j_1_old: fn(Index, Score) -> (),
-  write_hij_1_old: fn(Index, Score) -> (),
-  write_maxij_old: fn(Index, Score) -> (),
-
-  // Sbt Cols
-  get_A: fn(Index) -> Score,
-  get_C: fn(Index) -> Score,
-  get_G: fn(Index) -> Score,
-  get_T: fn(Index) -> Score,
-
-  write_A: fn(Index, Score) -> (),
-  write_C: fn(Index, Score) -> (),
-  write_G: fn(Index, Score) -> (),
-  write_T: fn(Index, Score) -> (),
-  write_Sbt: fn(Index, Index, Score) -> (),
-
-  begin: Index,
-  end: Index
-};
-
-fn @generate_register_array(begin: Index, end: Index) -> RegisterArray {
-  if end == begin {
-    RegisterArray {
-      // Inputs
-      get_iai:           @|_| undef[SequenceElem](),
-      get_ihi_1j:        @|_| undef[Score](),
-      get_imaxi_1j:      @|_| undef[Score](),
-      
-      write_iai:         @|_,_| (),
-      write_ihi_1j:      @|_,_| (),
-      write_imaxi_1j:    @|_,_| (),
-
-      // Scoring
-      get_hi_1j_old:     @|_| undef[Score](),
-      get_hi_1j_1_old:   @|_| undef[Score](),
-      get_hij_1_old:     @|_| undef[Score](),
-      get_maxij_old:     @|_| undef[Score](),
-
-      write_hi_1j_old:   @|_,_| (),
-      write_hi_1j_1_old: @|_,_| (),
-      write_hij_1_old:   @|_,_| (),
-      write_maxij_old:   @|_,_| (),
-
-      // Sbt Cols
-      get_A:             @|_| undef[Score](),
-      get_C:             @|_| undef[Score](),
-      get_G:             @|_| undef[Score](),
-      get_T:             @|_| undef[Score](),
-
-      write_A:           @|_,_| (),
-      write_C:           @|_,_| (),
-      write_G:           @|_,_| (),
-      write_T:           @|_,_| (),
-      write_Sbt:         @|_,_,_| (),
-
-      begin:             begin,
-      end:               end
-    }
-  }
-  else if begin + 1 == end {
-    // Inputs
-    let mut iai         = 4 as SequenceElem;
-    let mut ihi_1j      = 0 as Score;
-    let mut imaxi_1j    = 0 as Score;
-
-    // Scoring
-    let mut hi_1j_old   = 0 as Score;
-    let mut hi_1j_1_old = 0 as Score;
-    let mut hij_1_old   = 0 as Score;
-    let mut maxij_old   = 0 as Score;
-
-    // Sbt col
-    let mut a           = 0 as Score;
-    let mut c           = 0 as Score;
-    let mut g           = 0 as Score;
-    let mut t           = 0 as Score;
-    RegisterArray {
-      // Inputs
-      get_iai:           @|i| iai,
-      get_ihi_1j:        @|i| ihi_1j,
-      get_imaxi_1j:      @|i| imaxi_1j,
-      
-      write_iai:         @|i,v| iai = v,
-      write_ihi_1j:      @|i,v| ihi_1j = v,
-      write_imaxi_1j:    @|i,v| imaxi_1j = v,
-
-      // Scoring
-      get_hi_1j_old:     @|i| hi_1j_old,
-      get_hi_1j_1_old:   @|i| hi_1j_1_old,
-      get_hij_1_old:     @|i| hij_1_old,
-      get_maxij_old:     @|i| maxij_old,
-
-      write_hi_1j_old:   @|i,v| hi_1j_old = v,
-      write_hi_1j_1_old: @|i,v| hi_1j_1_old = v,
-      write_hij_1_old:   @|i,v| hij_1_old = v,
-      write_maxij_old:   @|i,v| maxij_old = v,
-
-      // Sbt col
-      get_A:             @|i| a,
-      get_C:             @|i| c,
-      get_G:             @|i| g,
-      get_T:             @|i| t,
-
-      write_A:           @|i,v| a = v,
-      write_C:           @|i,v| c = v,
-      write_G:           @|i,v| g = v,
-      write_T:           @|i,v| t = v,
-      write_Sbt:         @|i,k,v| if k == 0 { a = v }
-                             else if k == 1 { c = v }
-                             else if k == 2 { g = v }
-                             else if k == 3 { t = v }
-                             else { () }, 
-
-      begin:             begin,
-      end:               end
-    }
-  }
-  else {
-    let m = (end + begin) / 2;
-    let left = generate_register_array(begin, m);
-    let right = generate_register_array(m, end);
-    RegisterArray {
-      // Inputs
-      get_iai:           @|i|   if i >= m { right.get_iai(i) }             else { left.get_iai(i) },
-      get_ihi_1j:        @|i|   if i >= m { right.get_ihi_1j(i) }          else { left.get_ihi_1j(i) },
-      get_imaxi_1j:      @|i|   if i >= m { right.get_imaxi_1j(i) }        else { left.get_imaxi_1j(i) },
-
-      write_iai:         @|i,v| if i >= m { right.write_iai(i,v) }         else { left.write_iai(i,v) },
-      write_ihi_1j:      @|i,v| if i >= m { right.write_ihi_1j(i,v) }      else { left.write_ihi_1j(i,v) },
-      write_imaxi_1j:    @|i,v| if i >= m { right.write_imaxi_1j(i,v) }    else { left.write_imaxi_1j(i,v) },
-
-      // Scoring
-      get_hi_1j_old:     @|i|   if i >= m { right.get_hi_1j_old(i) }       else { left.get_hi_1j_old(i) },
-      get_hi_1j_1_old:   @|i|   if i >= m { right.get_hi_1j_1_old(i) }     else { left.get_hi_1j_1_old(i) },
-      get_hij_1_old:     @|i|   if i >= m { right.get_hij_1_old(i) }       else { left.get_hij_1_old(i) },
-      get_maxij_old:     @|i|   if i >= m { right.get_maxij_old(i) }       else { left.get_maxij_old(i) },
-
-      write_hi_1j_old:   @|i,v| if i >= m { right.write_hi_1j_old(i,v) }   else { left.write_hi_1j_old(i,v) },
-      write_hi_1j_1_old: @|i,v| if i >= m { right.write_hi_1j_1_old(i,v) } else { left.write_hi_1j_1_old(i,v) },
-      write_hij_1_old:   @|i,v| if i >= m { right.write_hij_1_old(i,v) }   else { left.write_hij_1_old(i,v) },
-      write_maxij_old:   @|i,v| if i >= m { right.write_maxij_old(i,v) }   else { left.write_maxij_old(i,v) },
-
-      // Sbt col
-      get_A:             @|i|   if i >= m { right.get_A(i) }               else { left.get_A(i) },
-      get_C:             @|i|   if i >= m { right.get_C(i) }               else { left.get_C(i) }, 
-      get_G:             @|i|   if i >= m { right.get_G(i) }               else { left.get_G(i) },
-      get_T:             @|i|   if i >= m { right.get_T(i) }               else { left.get_T(i) },
-
-      write_A:           @|i,v| if i >= m { right.write_A(i,v) }           else { left.write_A(i,v) },
-      write_C:           @|i,v| if i >= m { right.write_C(i,v) }           else { left.write_C(i,v) },
-      write_G:           @|i,v| if i >= m { right.write_G(i,v) }           else { left.write_G(i,v) },
-      write_T:           @|i,v| if i >= m { right.write_T(i,v) }           else { left.write_T(i,v) },
-      write_Sbt:         @|i,k,v| if k == 0 {
-                                if i >= m { right.write_A(i, v) }          else { left.write_A(i,v) }
-                           } else if k == 1 {
-                                if i >= m { right.write_C(i, v) }          else { left.write_C(i,v) }
-                           } else if k == 2 {
-                                if i >= m { right.write_G(i, v) }          else { left.write_G(i,v) }
-                           } else if k == 3 {
-                                if i >= m { right.write_T(i, v) }          else { left.write_T(i,v) }
-                           } else { () },
-
-      begin:             begin,
-      end:               end
-    }
-  }
-}
-*/
-
-/*
-  let acc = accelerator(device_id);
-
-  let subjectt = alloc_cpu(1 * sizeof[i8]());
-  let subject_lenn = alloc_cpu(2 * sizeof[Index]());
-  let querytt = alloc_cpu(3 * sizeof[i8]());
-  let query_lenn = alloc_cpu(4 * sizeof[Index]());
-  let olddata = alloc_cpu(5 * sizeof[Score]());
-  let resultt = alloc_cpu(6 * sizeof[Score]());
-
-  for work_item in acc.exec((1,1,1), (1,1,1)){
-    let subject = bitcast[&[1][i8]](subjectt.data);
-    let subject_len = bitcast[&[1][Index]](subject_lenn.data)(0);
-
-    let query = bitcast[&[1][i8]](querytt.data);
-    let query_len = bitcast[&[1][Index]](query_lenn.data)(0);
-
-    let mut olddatabuffer = bitcast[&mut[1][Score]](olddata.data);
-    // IGNORE the warning that olddatabuffer is never written to, we want this!
-
-    let registers = generate_register_array(0, PE_COUNT);
-
-    //readQuery
-    for pe in unroll(0, PE_COUNT) {
-      if(pe < query_len) {
-        registers.write_A(pe, -1 as Score);//scheme.mismatching_score();
-        registers.write_C(pe, -1 as Score);//scheme.mismatching_score();
-        registers.write_G(pe, -1 as Score);//scheme.mismatching_score();
-        registers.write_T(pe, -1 as Score);//scheme.mismatching_score();
-
-        registers.write_Sbt(pe, query(pe) as Index, 1 as Score);//scheme.matching_score();
-      }
-      else {
-        registers.write_A(pe, 0 as Score);
-        registers.write_C(pe, 0 as Score);
-        registers.write_G(pe, 0 as Score);
-        registers.write_T(pe, 0 as Score);
-      }
-      // Input + Scoring init already done
-      registers.write_iai(pe, 4 as i8);
-      registers.write_imaxi_1j(pe, 0 as Score);
-      registers.write_ihi_1j(pe, 0 as Score);
-
-      registers.write_hi_1j_old(pe, 0 as Score);
-      registers.write_hij_1_old(pe, 0 as Score);
-      registers.write_hi_1j_1_old(pe, 0 as Score);
-      registers.write_maxij_old(pe, 0 as Score);
-    }
-    
-    //// Compute the score
-    let mut bufoff = 0;
-    let mut inter_steps = query_len;
-    if(!(PE_COUNT < query_len)) {
-      inter_steps = PE_COUNT;
-    }
-    let steps = subject_len + inter_steps - 1;
-    //systolic0
-    for i in range(0, steps) {
-      if(i < subject_len) {
-        registers.write_iai(0, subject(i));
-        let tmp = olddatabuffer(i);
-        registers.write_ihi_1j(0, tmp);
-        registers.write_imaxi_1j(0, tmp);
-      }
-      else {
-        registers.write_iai(0, 4 as i8);
-        registers.write_ihi_1j(0, 0 as Score);
-        registers.write_imaxi_1j(0, 0 as Score);
-      }
-      //systolic1
-      for pe in unroll_rev(PE_COUNT - 1, -1) {
-        let iai = registers.get_iai(pe);
-
-        let mut m1 = 0 as Score;
-        if(iai < 4 as i8) { // 4 = SBT_COL_SIZE
-          m1 = registers.get_hi_1j_1_old(pe) + registers.get_iai(pe) as Score;
-        }
-                                          //-1 = scheme.gap_penalty()
-        let hij = max(0 as Score, max(m1, -1 + max(registers.get_hij_1_old(pe),
-                                                   registers.get_ihi_1j(pe))));
-        let maxij = max(hij, max(registers.get_imaxi_1j(pe), registers.get_maxij_old(pe)));
-
-        registers.write_hi_1j_1_old(pe, registers.get_ihi_1j(pe));
-        registers.write_maxij_old(pe, maxij);
-        registers.write_hij_1_old(pe, hij);
-        if(iai == 4 as i8) { // 4 = SBT_COL_SIZE
-          registers.write_hij_1_old(pe, registers.get_ihi_1j(pe));
-        }
-        //set input
-        if(pe + 1 < PE_COUNT) {
-          registers.write_iai(pe + 1, iai);
-          registers.write_ihi_1j(pe + 1, hij);
-          registers.write_imaxi_1j(pe + 1, maxij);
-        }
-      }
-      if(i >= PE_COUNT - 1) {
-        olddatabuffer(bufoff) = registers.get_hij_1_old(PE_COUNT - 1);
-        bufoff = bufoff + 1;
-      }
-    }
-    bitcast[&mut[1][Score]](resultt.data)(0) = registers.get_maxij_old(PE_COUNT - 1);
-  }
-
-//  bitcast[&[1][Score]](resultt.data)(0)
-*/

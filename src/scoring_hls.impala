@@ -64,8 +64,6 @@ fn @create_maximums_array(size: i32) -> MaximumsArray{
 
 fn @get_local_scoring_linmem(height: Index, width: Index, scheme: AlignmentScheme) -> Scoring{
     let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores, 0);
-    
-    // now, our PEs need to keep track over maximum values as well
     let maxs = create_maximums_array(PE_COUNT);
 
     let local_score_matrix = ScoringMatrix{
@@ -92,11 +90,9 @@ struct ScoringArray {
   write_ihi_1j: fn(Index, Score) -> (),
 
   // Score
-  get_hi_1j_old: fn(Index) -> Score,
   get_hi_1j_1_old: fn(Index) -> Score,
   get_hij_1_old: fn(Index) -> Score,
 
-  write_hi_1j_old: fn(Index, Score) -> (),
   write_hi_1j_1_old: fn(Index, Score) -> (),
   write_hij_1_old: fn(Index, Score) -> (),
 
@@ -106,7 +102,6 @@ struct ScoringArray {
 fn @create_scoring_array(size: i32) -> ScoringArray {
   let ihi_1j = create_data_vector(size, 0 as Score);
 
-  let hi_1j_old = create_data_vector(size, 0 as Score);
   let hi_1j_1_old = create_data_vector(size, 0 as Score);
   let hij_1_old = create_data_vector(size, 0 as Score);
 
@@ -116,11 +111,9 @@ fn @create_scoring_array(size: i32) -> ScoringArray {
     get_ihi_1j:        ihi_1j.read,
     write_ihi_1j:      ihi_1j.write,
 
-    get_hi_1j_old:     hi_1j_old.read,
     get_hi_1j_1_old:   hi_1j_1_old.read,
     get_hij_1_old:     hij_1_old.read,
 
-    write_hi_1j_old:   hi_1j_old.write,
     write_hi_1j_1_old: hi_1j_1_old.write,
     write_hij_1_old:   hij_1_old.write,
 
@@ -135,8 +128,6 @@ fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScores
     if(read_mask & READ_TOP_ROW_FLAG == READ_TOP_ROW_FLAG) {
       let mut top_cur = olddata.read_top_row(0);
       for pe in range(0, PE_COUNT) {
-        pe_scoring.write_hi_1j_old(pe, 0 as Score);
-
         let top_next = olddata.read_top_row(pe + 1);
         pe_scoring.write_hi_1j_1_old(pe, top_cur);
         pe_scoring.write_hij_1_old(pe, top_next);
@@ -144,7 +135,6 @@ fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScores
       }
     } else {
       for pe in range(0, PE_COUNT) {
-        pe_scoring.write_hi_1j_old(pe, 0 as Score);
         pe_scoring.write_hi_1j_1_old(pe, 0 as Score);
         pe_scoring.write_hij_1_old(pe, 0 as Score);
       }
@@ -165,10 +155,11 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
             read_no_gap:       |i, _| { pe_line.get_hi_1j_1_old(i) },
             read_gap_q:        |i, _| { pe_line.get_hij_1_old(i) },
             read_gap_s:        |i, _| { pe_line.get_ihi_1j(i) },
-            write:             |i, _, hij| {
-//                  let iai = pe_line.get_iai(i);
+            write:             |i, j, hij| {
                   if(pe_line.get_degenerate(i) == 0 as i8) {
-                      pe_line.write_hi_1j_1_old(i, pe_line.get_ihi_1j(i));
+                      if(j >= i) {
+                        pe_line.write_hi_1j_1_old(i, pe_line.get_ihi_1j(i));
+                      }
                       if(it.get_iai() != 4/*SBT_COL_SIZE*/ as SequenceElem) {
                         pe_line.write_hij_1_old(i, hij);
                       }
@@ -180,25 +171,14 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                       pe_line.write_hij_1_old(i, pe_line.get_ihi_1j(i));
                   }
               },
-            update_write:      |i, iiai| {
-                  let hij = pe_line.get_hij_1_old(i);
-                  let iai = iiai as SequenceElem;
-
-                  print_pragma("#pragma WRITE_IHI_1J");
-                  if(i + 1 < PE_COUNT) {
-//                      pe_line.write_iai(i + 1, iai);
-                      pe_line.write_ihi_1j(i + 1, hij);
-                  }
+            update_write:      @|i| {
+                  pe_line.write_ihi_1j(i + 1, pe_line.get_hij_1_old(i));
               },
             update_begin_line: @(?k)|k,i|{
-//                  if(iai == 4/*SBT_COL_SIZE*/) {
-//                      pe_line.write_iai(0, 4 as SequenceElem);
                   if(k == 1) {
                       pe_line.write_ihi_1j(0, 0 as Score);
                   }
                   else {
-                  //  pe_line.write_iai(0, iai as SequenceElem);
-
                       let tmp = olddata.read(i);
                       pe_line.write_ihi_1j(0, tmp as Score);
                   }
@@ -210,23 +190,6 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
             block_begin:       |ql,q_acc| {
                 //readQuery
                 for pe in range(0, PE_COUNT){
-                    /// TODO look up in sbt for mismatch/match cost when relaxing
-/*
-                    if(pe < ql) {
-                        let qv = q_acc.read(pe);
-                        pe_line.write_A(pe, olddata.matches(qv, 0 as SequenceElem));
-                        pe_line.write_C(pe, olddata.matches(qv, 1 as SequenceElem));
-                        pe_line.write_G(pe, olddata.matches(qv, 2 as SequenceElem));
-                        pe_line.write_T(pe, olddata.matches(qv, 3 as SequenceElem));
-                    }
-                    else {
-                        pe_line.write_A(pe, 0 as Score);
-                        pe_line.write_C(pe, 0 as Score);
-                        pe_line.write_G(pe, 0 as Score);
-                        pe_line.write_T(pe, 0 as Score);
-                    }
-  */                  
-                //  pe_line.write_iai(pe,      4 as SequenceElem);
                     if(pe < ql) {
                       pe_line.write_degenerate(pe, 0 as i8);
                     }
@@ -234,11 +197,6 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                       pe_line.write_degenerate(pe, 1 as i8);
                     }
                     pe_line.write_ihi_1j(pe,   0 as Score);
-                   /* 
-                    pe_line.write_hi_1j_old(pe,   0 as Score);
-                    pe_line.write_hij_1_old(pe,   0 as Score);
-                    pe_line.write_hi_1j_1_old(pe, 0 as Score);
-*/
                 }
             },
             block_end:         || {
@@ -263,15 +221,14 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
                 let maxij = max(hij, max(max_scores.get_imaxi_1j(i), max_scores.get_maxij_old(i)));
                 max_scores.write_maxij_old(i, maxij);
             },
-            update_write:      |i,iai| {
-                mat_acc.update_write(i, iai);
+            update_write:      |i| {
+                mat_acc.update_write(i);
                 if(i + 1 < PE_COUNT) {
                     max_scores.write_imaxi_1j(i + 1, max_scores.get_maxij_old(i));
                 }
             },
             update_begin_line: @(?k)|k,i| {
                 mat_acc.update_begin_line(k, i);
-//                if(iai == 4) {
                 if(k == 1) {
                     max_scores.write_imaxi_1j(0, 0 as Score);
                 }
@@ -296,45 +253,14 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
 }
 
 fn get_iteration_acc_hb_device(column_left: Vector, column_right: Vector, row: Vector, corners: Vector, block_width: Index) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
-    // TODO
-    print_string("get_iteration_acc_hb_device");
-    |offset_i, offset_j, height, width, is_left_half, it| -> ScoringMatrixAcc{
-        ScoringMatrixAcc{
-            read_no_gap:       |_, _| { 61 },
-            read_gap_q:        |_, _| { 62 },
-            read_gap_s:        |_, j| { 63 },
-            write:             |_, j, score| {
-            },
-            update_write:      |_,_| (),
-            update_begin_line: |i,_| {
-            },
-            update_end_line:   |i| {
-            },
-            block_begin:       |_,_| (),
-            block_end:         || {}
-        }
-    }
+    print_string("UNSUPPORTED: get_iteration_acc_hb_device");
+
+    undef[fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc]()
 }
 
 fn get_iteration_acc_tb_device(block_width: Index, init_scores: InitScoresAcc) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
-    // TODO
-    print_string("get_iteration_acc_tb_device");
-    |offset_i, offset_j, _, width, _, it| -> ScoringMatrixAcc{
-        ScoringMatrixAcc{
-            read_no_gap:       |_, _| { 61 },
-            read_gap_q:        |_, _| { 62 },
-            read_gap_s:        |_, j| { 63 },
-            write:             |_, j, score| {
-            },
-            update_write:      |_,_| (),
-            update_begin_line: |i,_| {
-            },
-            update_end_line:   |i| {
-            },
-            block_begin:       |_,_| (),
-            block_end:         || {}
-        }
-    }
+    print_string("UNSUPPORTED: get_iteration_acc_tb_device");
 
+    undef[fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc]()
 }
 
