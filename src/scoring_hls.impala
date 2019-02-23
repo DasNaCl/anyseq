@@ -37,9 +37,26 @@ fn @get_semiglobal_scoring_linmem(height: Index, width: Index, scheme: Alignment
     // the last column corresponds to the stuff that was written to left_column (aka init_scores)
     // We might be able to find the store using this information.
 
-    // TODO
+    let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores, 0);
+    let maxs = create_maximums_array(PE_COUNT);
 
-    get_global_scoring_linmem(height, width, scheme) // just degenerate to global to make verification happy
+    let semiglobal_score_matrix = ScoringMatrix{
+        get_iteration_acc:     get_semiglobal_linmem_iteration_acc_device(score_matrix, maxs, scheme.init_scores),
+        get_matrix:            score_matrix.get_matrix,
+        get_last_row:          score_matrix.get_last_row,
+        get_last_column:       score_matrix.get_last_column,
+        get_right_half_column: score_matrix.get_last_column,
+        release:               score_matrix.release
+    };
+
+    Scoring{
+        get_scoring_matrix:   || semiglobal_score_matrix,
+        get_score:            || undef[Score](),
+        get_score_pos:        || undef[(Index, Index)](),
+        get_left_half_scores:    semiglobal_score_matrix.get_last_column,
+        get_right_half_scores:   semiglobal_score_matrix.get_right_half_column,
+        release:              || ()
+    }
 }
 
 struct MaximumsArray {
@@ -220,6 +237,57 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
                 mat_acc.write(i, j, hij);
                 let maxij = max(hij, max(max_scores.get_imaxi_1j(i), max_scores.get_maxij_old(i)));
                 max_scores.write_maxij_old(i, maxij);
+            },
+            update_write:      |i| {
+                mat_acc.update_write(i);
+                if(i + 1 < PE_COUNT) {
+                    max_scores.write_imaxi_1j(i + 1, max_scores.get_maxij_old(i));
+                }
+            },
+            update_begin_line: @(?k)|k,i| {
+                mat_acc.update_begin_line(k, i);
+                if(k == 1) {
+                    max_scores.write_imaxi_1j(0, 0 as Score);
+                }
+                else {
+                    let tmp = olddata.read(i);
+                    max_scores.write_imaxi_1j(0, tmp as Score);
+                }
+            },
+            update_end_line:   mat_acc.update_end_line,
+            block_begin:       |a,b| {
+                mat_acc.block_begin(a,b);
+                for pe in range(0, PE_COUNT) {
+                  max_scores.write_imaxi_1j(pe, 0 as Score);
+                  max_scores.write_maxij_old(pe, 0 as Score);
+                }
+            },
+            block_end:         || {
+                it.write_result(max_scores.get_maxij_old(PE_COUNT - 1));
+            }
+        }
+    }
+}
+
+
+fn get_semiglobal_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores: MaximumsArray, olddata: InitScoresAcc) -> fn(Index, Index, Index, Index, bool, IterationInfo) -> ScoringMatrixAcc{
+    |offset_i, offset_j, height, width, is_left_half, it| {
+        let mat_acc = score_matrix.get_iteration_acc(offset_i, offset_j, height, width, is_left_half, it);
+
+        ScoringMatrixAcc{
+            read_no_gap:       mat_acc.read_no_gap,
+            read_gap_q:        mat_acc.read_gap_q,
+            read_gap_s:        mat_acc.read_gap_s,
+            write:             |i,j,hij| {
+                mat_acc.write(i, j, hij);
+
+                let is_bottom = j - i >= it.subject_len;
+                /// rightmost column maximization must happen on PS!!
+                //let is_right  = i == PE_COUNT - 1 && j >= PE_COUNT - 1;
+                if(is_bottom) {
+                  let maxij = max(hij, max(max_scores.get_imaxi_1j(i), max_scores.get_maxij_old(i)));
+                  max_scores.write_maxij_old(i, maxij);
+                }
             },
             update_write:      |i| {
                 mat_acc.update_write(i);

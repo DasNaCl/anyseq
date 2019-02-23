@@ -7,21 +7,26 @@ static BLOCK_HEIGHT = 1;
 struct IterationInfo {
   get_iai: fn() -> SequenceElem,
   write_iai: fn(SequenceElem) -> (),
-  write_result: fn(Score) -> ()
+  write_result: fn(Score) -> (),
+
+  subject_len: i32
 }
 
-fn @create_iteration_info(result: Buffer) -> IterationInfo {
+fn @create_iteration_info(result: Buffer, s_len: i32) -> IterationInfo {
     let mut iai_cpy = 4 as SequenceElem;
     IterationInfo{
       get_iai:   @|| iai_cpy,
       write_iai: @|v| iai_cpy = v,
       
-      write_result: @|v| bitcast[&mut[1][Score]](result.data)(0) = v
+      write_result: @|v| bitcast[&mut[1][Score]](result.data)(0) = v,
+
+      subject_len: s_len      
     }
 }
 
 fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix, predc: PredecessorMatrix, scheme: AlignmentScheme, body: RelaxationBody) -> ()
 {
+
     let acc = accelerator(device_id);
 
     let subjectt = acc.alloc(1 * sizeof[SequenceElem]());
@@ -48,7 +53,7 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         let que_acc = get_sequence_acc(seq_reader(querytt, query_len),  seq_writer(querytt, query_len));
         let sub_acc = get_sequence_acc(seq_reader(subjectt, subject_len), seq_writer(subjectt, subject_len));
 
-        let itinf = create_iteration_info(resultt);
+        let itinf = create_iteration_info(resultt, subject_len);
         let sco_acc = scores.get_iteration_acc(0, 0, 0, PE_COUNT, false, itinf);
         let pre_acc = predc.get_iteration_acc(0, 0, 1, 1, itinf);
 
