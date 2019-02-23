@@ -1,6 +1,4 @@
 
-static PE_COUNT = 10;
-
 static BLOCK_WIDTH = PE_COUNT;
 static BLOCK_HEIGHT = 1;
 

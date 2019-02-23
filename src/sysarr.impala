@@ -40,9 +40,6 @@ struct DataVector {
 
 fn @create_data_vector1(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 1];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME complete dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -53,9 +50,6 @@ fn @create_data_vector1(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector2(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 2];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME complete dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -66,9 +60,6 @@ fn @create_data_vector2(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector4(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 4];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME complete dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -79,9 +70,6 @@ fn @create_data_vector4(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector8(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 8];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME complete dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -92,9 +80,6 @@ fn @create_data_vector8(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector16(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 16];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=4 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -105,9 +90,6 @@ fn @create_data_vector16(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector32(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 32];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=8 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -118,9 +100,6 @@ fn @create_data_vector32(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector64(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 64];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=16 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -131,9 +110,6 @@ fn @create_data_vector64(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector128(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 128];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=32 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -144,9 +120,6 @@ fn @create_data_vector128(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector256(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 256];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=64 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -157,9 +130,6 @@ fn @create_data_vector256(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector512(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 512];
-  if(is_hls()) {
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=PATCHME block factor=128 dim=1")
-  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,

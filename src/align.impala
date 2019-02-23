@@ -181,7 +181,6 @@ fn relax(query: Sequence, subject: Sequence, scoring: ScoringMatrix, predecessor
         let gap_q_entry  = sco_acc.read_gap_q (i, j);
         let gap_s_entry  = sco_acc.read_gap_s (i, j);
 
-    print_pragma("#pragma right before relax");
         let (score, predc) = @@(relax_fn)(sym_q, sym_s, no_gap_entry, gap_q_entry, gap_s_entry);
         
         sco_acc.write(i, j, score);
