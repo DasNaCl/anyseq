@@ -84,7 +84,7 @@ add_executable(align
 
 target_link_libraries(align 
     ${ANYDSL_RUNTIME_LIBRARY} 
-    ${ANYDSL_RUNTIME_LIBRARIES} -lOpenCL)
+    ${ANYDSL_RUNTIME_LIBRARIES})
 
 set_target_properties(align PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON)
 

@@ -17,11 +17,11 @@ fn @get_init_scores_acc(read: fn(Index) -> Score, write: fn(Index, Score) -> (),
     let top_row = acc.alloc(7 * sizeof[Score]());
     
     InitScoresAcc{
-      read:  |i|   bitcast[&[1][Score]](left_column.data)(i),
-      write: |i,v| bitcast[&mut[1][Score]](left_column.data)(i) = v,
+      read:  @(?i)|i|   bitcast[&[1][Score]](left_column.data)(i),
+      write: @(?i)|i,v| bitcast[&mut[1][Score]](left_column.data)(i) = v,
 
-      read_top_row:      |i|   bitcast[&[1][Score]](top_row.data)(i),
-      write_top_row:     |i,v| bitcast[&mut[1][Score]](top_row.data)(i) = v,
+      read_top_row:      @(?i)|i|   bitcast[&[1][Score]](top_row.data)(i),
+      write_top_row:     @(?i)|i,v| bitcast[&mut[1][Score]](top_row.data)(i) = v,
 
       matches: sc.matches
     }
@@ -196,13 +196,16 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                       pe_line.write_ihi_1j(0, 0 as Score);
                   }
                   else {
-                      let tmp = olddata.read(i);
-                      pe_line.write_ihi_1j(0, tmp as Score);
+                      pe_line.write_ihi_1j(0, i as Score);
                   }
               },
-            update_end_line:   |bufoff|{
+            update_end_line:   |i,bufoff|{
                   let hij_1_old = pe_line.get_hij_1_old(PE_COUNT - 1);
-                  olddata.write(bufoff, hij_1_old);
+                  if(bufoff == 0 || i + 1 >= 0) {
+                    print_pragma("#pragma %assert tlast%");
+                  }
+                  // we choose to use 0 by design! (will be patched)
+                  olddata.write(0, hij_1_old);
               },
             block_begin:       |ql,q_acc| {
                 //readQuery

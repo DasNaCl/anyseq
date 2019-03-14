@@ -24,7 +24,6 @@ fn @create_iteration_info(result: Buffer, s_len: i32) -> IterationInfo {
 
 fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix, predc: PredecessorMatrix, scheme: AlignmentScheme, body: RelaxationBody) -> ()
 {
-
     let acc = accelerator(device_id);
 
     // subjectt will contain a subject sequence letter and a column cell score
@@ -35,15 +34,7 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
     let querytt_lenn = acc.alloc(4 * sizeof[Index]());
     let resultt = acc.alloc(6 * sizeof[Score]());
 
-    fn seq_reader(seq: Buffer, len: Index) -> ReadSequenceFn{
-      |i| if i >= len { 4 as SequenceElem } else { bitcast[&[1][SequenceElem]](seq.data)(i) }
-    }
-    fn seq_writer(seq: Buffer, len: Index) -> WriteSequenceFn{
-      |i,v| if i >= len { () } else { bitcast[&mut[1][SequenceElem]](seq.data)(i) = v }
-    }
-
     for work_item in acc.exec((1,1,1), (1,1,1)) {
-
         let scoring = scheme.get_scoring(0, 0, scheme);
         let scores = scoring.get_scoring_matrix();
 
@@ -56,16 +47,19 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
 
         let iai = create_data_vector(PE_COUNT, 0 as Score);
         let query_cpy = create_data_vector(PE_COUNT, 0 as Score);
+        let old_inputs = create_data_vector(PE_COUNT, 0 as Score);
 
         /// readQuery
         for pe in range(0, PE_COUNT){
             iai.write(pe, 4 as Score);
             query_cpy.write(pe, bitcast[&[1][SequenceElem]](querytt.data)(pe) as i32);
         }
-        let que_acc = get_sequence_acc(|i|   if i >= PE_COUNT { 4 as SequenceElem } else { query_cpy.read(i) as u8 },
-                                       |i,v| if i >= PE_COUNT { () } else { query_cpy.write(i, v as i32) });
-        let sub_acc = get_sequence_acc(seq_reader(subjectt, subject_len), seq_writer(subjectt, subject_len));
-
+        let que_acc = get_sequence_acc(|i|   if i >= PE_COUNT    { 4 as SequenceElem } else { query_cpy.read(i) as u8 },
+                                       |i,v| if i >= PE_COUNT    { () } else { query_cpy.write(i, v as i32) });
+            // subject is special as it will use hls::stream type, thus we visibly only access the very first element
+        let mut sub_register = 0 as SequenceElem;
+        let sub_acc = get_sequence_acc(|i|   if i >= subject_len { 4 as SequenceElem } else { sub_register },
+                                       |i,v| if i >= subject_len { () } else { sub_register = v });
         sco_acc.block_begin(query_len, que_acc);
 
         let mut bufoff = 0;
@@ -73,13 +67,19 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         /// systolic0
         for i in range(0, steps) {
             if(i < subject_len) {
-                let s = sub_acc.read(i);
-                sco_acc.update_begin_line(0, i);
+                let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
+                old_inputs.write(i % PE_COUNT, subc_buf_pair);
+
+                let subc = (subc_buf_pair >> 16) as SequenceElem;
+                let buf = (subc_buf_pair << 16) >> 16;
+                sub_acc.write(i, subc);
+                let s = subc;
+                sco_acc.update_begin_line(0, buf);
                 iai.write(0, s as Score);
             }
             else {
                 iai.write(0, 4 as Score);
-                sco_acc.update_begin_line(1, i);
+                sco_acc.update_begin_line(1, 0);
             }
             /// systolic1
             for pe in unroll_rev(PE_COUNT - 1, -1) {
@@ -96,8 +96,10 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
                 }
             }
             if(i >= PE_COUNT - 1) {
-                sco_acc.update_end_line(bufoff);
-                bufoff = bufoff + 1;
+                let ol = old_inputs.read(bufoff);
+                sco_acc.update_end_line(i - steps, ol);
+
+                if(bufoff >= PE_COUNT - 1) { bufoff = 0; } else { bufoff = bufoff + 1 }
             }
         }
 

@@ -1,4 +1,6 @@
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <algorithm>
 #include <map>
 
@@ -26,6 +28,33 @@ public:
 		: sourceManager_(sm), rewriter_(r), parameterNames_()
 	{ }
 
+  virtual clang::Expr* VisitUnaryOperator(clang::UnaryOperator* uop)
+  {
+    if (uop->getOpcode() == Opcode::Deref)
+    {
+      // check underlying declref
+      auto* under_expr = uop->getSubExpr();
+      if (clang::isa<clang::ImplicitCastExpr>(under_expr))
+      {
+        auto* deep_under_expr = clang::cast<clang::ImplicitCastExpr>(under_expr)->getSubExprAsWritten();
+        if (clang::isa<clang::DeclRefExpr>(deep_under_expr))
+        {
+          auto* ex = clang::cast<clang::DeclRefExpr>(deep_under_expr);
+          auto name = ex->getNameInfo().getName().getAsString();
+
+          if (parameterNames_.find(name) != parameterNames_.end())
+          {
+            std::string newName = parameterNames_[name];
+            std::cout << "\tRenaming: " << name << " -> " << newName << std::endl;
+
+            rewriter_.ReplaceText(expr->getNameInfo().getSourceRange(), newName + ".read()");
+          }
+        }
+      }
+    }
+  }
+
+  /*
   virtual clang::Expr* VisitDeclRefExpr(clang::DeclRefExpr* expr)
   {
     auto name = expr->getNameInfo().getName().getAsString();
@@ -39,6 +68,7 @@ public:
     }
     return expr;
   }
+  */
 
 	virtual bool VisitFunctionDecl(clang::FunctionDecl* func)
 	{
@@ -98,7 +128,6 @@ public:
         std::cout << "Replacing: " << oldType << " -> " << newType << std::endl;
 
         std::string newDecl = newType + " " + newParName + (i != 1 && i != 6 ? "" : "[PE_COUNT]");
-//        rewriter_.ReplaceText(std::get<1>(new_par)->getSourceRange(), newDecl);
         rewriter_.ReplaceText(old_par->getSourceRange(), newDecl);
       }
 		}
@@ -125,11 +154,20 @@ public:
 	}
 };
 
+void add_include(std::string path);
+
 class FunctionDeclFrontendAction : public clang::ASTFrontendAction
 {
+  std::string file;
 public:
   virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance& CI, clang::StringRef file) {
+    this->file = file.str();
     return std::make_unique<FunctionDeclASTConsumer>(CI);
+  }
+
+  ~FunctionDeclFrontendAction()
+  {
+    add_include(file);
   }
 };
 
@@ -141,9 +179,33 @@ int main(int argc, const char **argv)
 	llvm::cl::OptionCategory MyToolCategory("anyseq_hls_postproc options");
 	CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
 
+  std::stringstream ss;
+  std::streambuf* old = std::cout.rdbuf(ss.rdbuf());
+
 	ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
 	Tool.run(newFrontendActionFactory<FunctionDeclFrontendAction>().get());
 
-    return 0;
+  std::cerr.rdbuf(old);
+  ss.str();
+
+  return 0;
 }
+
+void add_include(std::string path)
+{
+  std::stringstream ss;
+  {
+    std::ifstream inf(path);
+    for(std::string str; std::getline(inf, str); ss << str << "\n") 
+    {  }
+  }
+  {
+    std::ofstream off(path);
+    // adds the include "align.h"
+    off << "#include \"align.h\"\n"; 
+    for(std::string str; std::getline(ss, str); off << str << "\n")
+    {  }
+  }
+}
+
 

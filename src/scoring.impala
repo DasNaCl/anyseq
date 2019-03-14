@@ -23,7 +23,7 @@ struct ScoringMatrixAcc {
     write:             fn(Index, Index, Score) -> (),
     update_write:      fn(Index) -> (),
     update_begin_line: fn(Index, Index) -> (),
-    update_end_line:   fn(Index) -> (),
+    update_end_line:   fn(Index, Score) -> (),
     block_begin:       fn(Index, SequenceAcc) -> (),
     block_end:         fn() -> ()
 }
@@ -82,7 +82,7 @@ fn create_scoring_matrix_full(height: Index, width: Index, init_scores: InitScor
             write:             |i, j, val| mat_acc.write(i, j, val),
             update_write:      |_| {},
             update_begin_line: |_,_| {},
-            update_end_line:   |_| {},
+            update_end_line:   |_,_| {},
             block_begin:       |_,_| {},
             block_end:         || {}
         }
