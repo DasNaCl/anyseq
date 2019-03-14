@@ -35,6 +35,17 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
     let resultt = acc.alloc(6 * sizeof[Score]());
 
     for work_item in acc.exec((1,1,1), (1,1,1)) {
+        // IO specification  -  port names are post-patched, so we may hardcode them here....
+        print_pragma("#pragma HLS INTERFACE axis off port=sub");
+        print_pragma("#pragma HLS STREAM variable=sub dim=1");
+        print_pragma("#pragma HLS INTERFACE axis off port=wbuff");
+        print_pragma("#pragma HLS STREAM variable=wbuff dim=1");
+        print_pragma("#pragma HLS s_axilite depth=?PE_COUNT? port=query bundle=CTRL");
+        print_pragma("#pragma HLS s_axilite register depth=1 port=s_len bundle=CTRL");
+        print_pragma("#pragma HLS s_axilite register depth=1 port=q_len bundle=CTRL");
+        print_pragma("#pragma HLS s_axilite register depth=1 port=res bundle=CTRL");
+        print_pragma("#pragma HLS s_axilite port=return bundle=CTRL");
+
         let scoring = scheme.get_scoring(0, 0, scheme);
         let scores = scoring.get_scoring_matrix();
 
@@ -49,7 +60,7 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         let query_cpy = create_data_vector(PE_COUNT, 0 as Score);
 
         /// readQuery
-        for pe in range(0, PE_COUNT){
+        for pe in unroll(0, PE_COUNT){
             iai.write(pe, 4 as Score);
             query_cpy.write(pe, bitcast[&[1][SequenceElem]](querytt.data)(pe) as i32);
         }
@@ -65,6 +76,8 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         let steps = subject_len + max(query_len, PE_COUNT) - 1;
         /// systolic0
         for i in range(0, steps) {
+          print_pragma("#pragma HLS PIPELINE II=1");
+          print_pragma("#pragma HLS LOOP_TRIPCOUNT min=4699745 max=4699762 avg=4699762");
             if(i < subject_len) {
                 let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
 //                old_inputs.write(i % PE_COUNT, subc_buf_pair);
