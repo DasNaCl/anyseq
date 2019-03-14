@@ -253,8 +253,7 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
                     max_scores.write_imaxi_1j(0, 0 as Score);
                 }
                 else {
-                    let tmp = olddata.read(i);
-                    max_scores.write_imaxi_1j(0, tmp as Score);
+                    max_scores.write_imaxi_1j(0, i as Score);
                 }
             },
             update_end_line:   mat_acc.update_end_line,
@@ -304,8 +303,7 @@ fn get_semiglobal_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_s
                     max_scores.write_imaxi_1j(0, 0 as Score);
                 }
                 else {
-                    let tmp = olddata.read(i);
-                    max_scores.write_imaxi_1j(0, tmp as Score);
+                    max_scores.write_imaxi_1j(0, i as Score);
                 }
             },
             update_end_line:   mat_acc.update_end_line,

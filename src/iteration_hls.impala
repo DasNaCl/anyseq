@@ -68,13 +68,12 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
             if(i < subject_len) {
                 let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
 //                old_inputs.write(i % PE_COUNT, subc_buf_pair);
-                print_pragma("#pragma %set old_inputs%");
 
                 let subc = (subc_buf_pair >> 16) as SequenceElem;
-                let buf = (subc_buf_pair << 16) >> 16;
+                let bufff = (subc_buf_pair << 16) >> 16;
                 sub_acc.write(i, subc);
                 let s = subc;
-                sco_acc.update_begin_line(0, buf);
+                sco_acc.update_begin_line(0, bufff);
                 iai.write(0, s as Score);
             }
             else {

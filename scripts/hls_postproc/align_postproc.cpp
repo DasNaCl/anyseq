@@ -30,7 +30,7 @@ public:
 
   virtual clang::Expr* VisitUnaryOperator(clang::UnaryOperator* uop)
   {
-    if (uop->getOpcode() == Opcode::Deref)
+    if (uop->getOpcode() == clang::UnaryOperatorKind::UO_Deref)
     {
       // check underlying declref
       auto* under_expr = uop->getSubExpr();
@@ -39,8 +39,8 @@ public:
         auto* deep_under_expr = clang::cast<clang::ImplicitCastExpr>(under_expr)->getSubExprAsWritten();
         if (clang::isa<clang::DeclRefExpr>(deep_under_expr))
         {
-          auto* ex = clang::cast<clang::DeclRefExpr>(deep_under_expr);
-          auto name = ex->getNameInfo().getName().getAsString();
+          auto* expr = clang::cast<clang::DeclRefExpr>(deep_under_expr);
+          auto name = expr->getNameInfo().getName().getAsString();
 
           if (parameterNames_.find(name) != parameterNames_.end())
           {
@@ -52,9 +52,9 @@ public:
         }
       }
     }
+    return uop;
   }
 
-  /*
   virtual clang::Expr* VisitDeclRefExpr(clang::DeclRefExpr* expr)
   {
     auto name = expr->getNameInfo().getName().getAsString();
@@ -68,7 +68,6 @@ public:
     }
     return expr;
   }
-  */
 
 	virtual bool VisitFunctionDecl(clang::FunctionDecl* func)
 	{
@@ -86,48 +85,60 @@ public:
 			rewriter_.ReplaceText(func->getNameInfo().getSourceRange(), newFuncName);
 
       //sort params
-      std::vector<std::tuple<std::uint64_t, clang::ParmVarDecl*, clang::ConstantArrayTypeLoc>> parms;
+      std::size_t c = 0;
+      std::vector<std::pair<std::uint64_t, std::size_t>> parms;
       for (clang::ParmVarDecl* param : func->parameters())
       {
         auto* type = param->getOriginalType().getTypePtr();
         assert(type->isArrayType());
 
         std::uint64_t arr_size = llvm::dyn_cast<clang::ConstantArrayType>(type->getAsArrayTypeUnsafe())->getSize().getLimitedValue();
-        parms.emplace_back(arr_size, param, param->getTypeSourceInfo()->getTypeLoc().getAs<clang::ConstantArrayTypeLoc>());
+        parms.emplace_back(arr_size, c++);
+       // arr_size, param, param->getTypeSourceInfo()->getTypeLoc().getAs<clang::ConstantArrayTypeLoc>());
       }
-      std::sort(parms.begin(), parms.end(), [](std::tuple<std::uint64_t, clang::ParmVarDecl*, clang::ConstantArrayTypeLoc> a, std::tuple<std::uint64_t, clang::ParmVarDecl*, clang::ConstantArrayTypeLoc> b)
+      std::sort(parms.begin(), parms.end(), [](std::pair<std::uint64_t, std::size_t> a, std::pair<std::uint64_t, std::size_t> b)
                                             { return std::get<0>(a) < std::get<0>(b); });
       /*  Order should be:  ([7] appears only for globals)
        *   [1], [3], [2], [4], [5], [6], ([7])
        */
-      std::iter_swap(parms.begin() + 1, parms.begin() + 2);
+//      std::iter_swap(parms.begin() + 1, parms.begin() + 2);
 
       for (std::size_t i = 0; i < func->parameters().size(); ++i)
       {
         auto* old_par = func->parameters()[i];
         auto new_par = parms[i];
+        std::size_t t = new_par.first;
+        std::size_t j = new_par.second;
         
         std::string oldParName = old_par->getName().str();
-        std::string newParName = (i == 0 ? "sub" :
-                                 (i == 1 ? "query" :
-                                 (i == 2 ? "subject_len" :
-                                 (i == 3 ? "query_len" :
-                                 (i == 4 ? "wbuff" : 
-                                 (i == 5 ? "res" :
-                                 (i == 6 ? "top_row" :  "__INVALID_NAME__")))))));
+        std::string newParName = (t == 1 ? "sub" :
+                                 (t == 2 ? "query" :
+                                 (t == 3 ? "subject_len" :
+                                 (t == 4 ? "query_len" :
+                                 (t == 5 ? "wbuff" : 
+                                 (t == 6 ? "res" :
+                                 (t == 7 ? "top_row" :  "__INVALID_NAME__")))))));
         std::cout << "Renaming: " << oldParName << " -> " << newParName << std::endl;
-        parameterNames_[oldParName] = newParName;
+
+        // we need to match the oldParName in relation to i, not t
+        parameterNames_[oldParName] = (j == 0 ? "sub" :
+                                      (j == 1 ? "query" :
+                                      (j == 2 ? "subject_len" :
+                                      (j == 3 ? "query_len" :
+                                      (j == 4 ? "wbuff" : 
+                                      (j == 5 ? "res" :
+                                      (j == 6 ? "top_row" :  "__INVALID_NAME__")))))));
 
         std::string oldType = old_par->getOriginalType().getAsString();
-        std::string newType = (i == 0 ? "hls::stream<InputStreamType>&" :
-                              (i == 1 ? "SequenceElem" : //[PE_COUNT]
-                              (i == 2 || i == 3 ? "int" :
-                              (i == 4 ? "hls::stream<OutputStreamType>&" :
-                              (i == 5 ? "ScoreType" :
-                              (i == 6 ? "ScoreType" /*[PE_COUNT]*/ : "__INVALID_TYPE__"))))));
+        std::string newType = (t == 1 ? "hls::stream<InputStreamType>&" :
+                              (t == 2 ? "SequenceElem" : //[PE_COUNT]
+                              (t == 3 || t == 4 ? "int" :
+                              (t == 5 ? "hls::stream<OutputStreamType>&" :
+                              (t == 6 ? "ScoreType*" :
+                              (t == 7 ? "ScoreType" /*[PE_COUNT]*/ : "__INVALID_TYPE__"))))));
         std::cout << "Replacing: " << oldType << " -> " << newType << std::endl;
 
-        std::string newDecl = newType + " " + newParName + (i != 1 && i != 6 ? "" : "[PE_COUNT]");
+        std::string newDecl = newType + " " + newParName + (t != 2 && t != 7 ? "" : "[PE_COUNT]");
         rewriter_.ReplaceText(old_par->getSourceRange(), newDecl);
       }
 		}
