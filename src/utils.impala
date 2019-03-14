@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------
 
-fn @min(a: Index, b: Index) -> Index { if a < b { a } else { b } }
-fn @max(a: Index, b: Index) -> Index { if a > b { a } else { b } }
+fn min(a: Index, b: Index) -> Index { if a < b { a } else { b } }
+fn max(a: Index, b: Index) -> Index { if a > b { a } else { b } }
 
 fn @min3(a: Index, b: Index, c: Index) -> Index { min(min(a, b), c) }
 fn @max3(a: Index, b: Index, c: Index) -> Index { max(max(a, b), c) }

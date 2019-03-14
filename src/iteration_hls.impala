@@ -27,7 +27,9 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
 
     let acc = accelerator(device_id);
 
-    let subjectt = acc.alloc(1 * sizeof[SequenceElem]());
+    // subjectt will contain a subject sequence letter and a column cell score
+    //   subjectt[i] = sub_seq[i] << 16U | (left_col[i] & 0xFFFF);
+    let subjectt = acc.alloc(1 * sizeof[i32]());
     let subject_lenn = acc.alloc(2 * sizeof[Index]());
     let querytt = acc.alloc(3 * sizeof[SequenceElem]());
     let querytt_lenn = acc.alloc(4 * sizeof[Index]());
@@ -47,21 +49,24 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
 
         let query_len = bitcast[&[1][Index]](querytt_lenn.data)(0);
         let subject_len = bitcast[&[1][Index]](subject_lenn.data)(0);
-   
-        let que_acc = get_sequence_acc(seq_reader(querytt, query_len),  seq_writer(querytt, query_len));
-        let sub_acc = get_sequence_acc(seq_reader(subjectt, subject_len), seq_writer(subjectt, subject_len));
 
         let itinf = create_iteration_info(resultt, subject_len);
         let sco_acc = scores.get_iteration_acc(0, 0, 0, PE_COUNT, false, itinf);
         let pre_acc = predc.get_iteration_acc(0, 0, 1, 1, itinf);
 
         let iai = create_data_vector(PE_COUNT, 0 as Score);
+        let query_cpy = create_data_vector(PE_COUNT, 0 as Score);
 
         /// readQuery
-        sco_acc.block_begin(query_len, que_acc);
         for pe in range(0, PE_COUNT){
             iai.write(pe, 4 as Score);
+            query_cpy.write(pe, bitcast[&[1][SequenceElem]](querytt.data)(pe) as i32);
         }
+        let que_acc = get_sequence_acc(|i|   if i >= PE_COUNT { 4 as SequenceElem } else { query_cpy.read(i) as u8 },
+                                       |i,v| if i >= PE_COUNT { () } else { query_cpy.write(i, v as i32) });
+        let sub_acc = get_sequence_acc(seq_reader(subjectt, subject_len), seq_writer(subjectt, subject_len));
+
+        sco_acc.block_begin(query_len, que_acc);
 
         let mut bufoff = 0;
         let steps = subject_len + max(query_len, PE_COUNT) - 1;

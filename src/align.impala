@@ -67,14 +67,14 @@ fn relax_global(q: Symbol, s: Symbol, no_gap_entry: Score, gap_q_entry: Score, g
 
 fn relax_local(q: Symbol, s: Symbol, no_gap_entry: Score, gap_q_entry: Score, gap_s_entry: Score, matches: MatchFn, gap: GapFn) -> (Score, Predecessor) 
 {
-    let (mut score, mut predc) = relax_global(q, s, no_gap_entry, gap_q_entry, gap_s_entry, matches, gap);
+    let (score, predc) = relax_global(q, s, no_gap_entry, gap_q_entry, gap_s_entry, matches, gap);
     
     if 0 > score {
-        score = 0;
-        predc = PRED_NONE;
+        (0, PRED_NONE)
     }
-    
-    (score, predc)
+    else {
+        (score, predc)
+    }
 }
 
 

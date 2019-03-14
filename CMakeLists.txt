@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
 
-
 project(AnyAlign)
 
 find_package(AnyDSL_runtime REQUIRED)
@@ -86,3 +85,10 @@ target_link_libraries(align
 
 set_target_properties(align PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON)
 
+if(BACKEND STREQUAL "hls")
+    # We assume align_postproc is already built for simplicity
+    add_custom_command(TARGET align POST_BUILD
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/hls_postproc/anyseq_hls_postproc ${CMAKE_CURRENT_SOURCE_DIR}
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                        COMMENT "Fixing HLS interface...")
+endif()
