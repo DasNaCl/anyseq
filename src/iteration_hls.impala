@@ -46,6 +46,10 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         print_pragma("#pragma HLS s_axilite register depth=1 port=res bundle=CTRL");
         print_pragma("#pragma HLS s_axilite port=return bundle=CTRL");
 
+        // some helper stuff. We have to modify the C code by hand later on, so we may as well make our life easier with dirty hacks
+        print_pragma("OutputStreamType outstorage;");
+        print_pragma("int tlast;");
+
         let scoring = scheme.get_scoring(0, 0, scheme);
         let scores = scoring.get_scoring_matrix();
 

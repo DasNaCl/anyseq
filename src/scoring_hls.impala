@@ -202,8 +202,12 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
             update_end_line:   |i,bufoff|{
                   let hij_1_old = pe_line.get_hij_1_old(PE_COUNT - 1);
                   if(bufoff == 0 || i + 1 >= 0) {
-                    print_pragma("#pragma %assert tlast%");
+                      print_pragma("tlast = 1;");
+                  } else {
+                      print_pragma("tlast = 0;");
                   }
+                  print_pragma("outstore.data = ?PATCH ME?;");
+                  print_pragma("outstore.last = tlast;");
                   // we choose to use 0 by design! (will be patched)
                   olddata.write(0, hij_1_old);
               },
