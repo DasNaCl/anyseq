@@ -28,6 +28,7 @@ public:
 		: sourceManager_(sm), rewriter_(r), parameterNames_()
 	{ }
 
+    /*
   virtual clang::Expr* VisitUnaryOperator(clang::UnaryOperator* uop)
   {
     if (uop->getOpcode() == clang::UnaryOperatorKind::UO_Deref)
@@ -54,6 +55,7 @@ public:
     }
     return uop;
   }
+  */
 
   virtual clang::Expr* VisitDeclRefExpr(clang::DeclRefExpr* expr)
   {
@@ -95,6 +97,15 @@ public:
         std::uint64_t arr_size = llvm::dyn_cast<clang::ConstantArrayType>(type->getAsArrayTypeUnsafe())->getSize().getLimitedValue();
         parms.emplace_back(arr_size, c++);
        // arr_size, param, param->getTypeSourceInfo()->getTypeLoc().getAs<clang::ConstantArrayTypeLoc>());
+
+        auto name = param->getName().str();
+        parameterNames_[name] = (arr_size == 1 ? "sub" :
+                                (arr_size == 2 ? "query" :
+                                (arr_size == 3 ? "subject_len" :
+                                (arr_size == 4 ? "query_len" :
+                                (arr_size == 5 ? "wbuff" :
+                                (arr_size == 6 ? "res" :
+                                (arr_size == 7 ? "top_row" :  "__INVALID_NAME__"))))))); 
       }
       std::sort(parms.begin(), parms.end(), [](std::pair<std::uint64_t, std::size_t> a, std::pair<std::uint64_t, std::size_t> b)
                                             { return std::get<0>(a) < std::get<0>(b); });
@@ -119,15 +130,6 @@ public:
                                  (t == 6 ? "res" :
                                  (t == 7 ? "top_row" :  "__INVALID_NAME__")))))));
         std::cout << "Renaming: " << oldParName << " -> " << newParName << std::endl;
-
-        // we need to match the oldParName in relation to i, not t
-        parameterNames_[oldParName] = (j == 0 ? "sub" :
-                                      (j == 1 ? "query" :
-                                      (j == 2 ? "subject_len" :
-                                      (j == 3 ? "query_len" :
-                                      (j == 4 ? "wbuff" : 
-                                      (j == 5 ? "res" :
-                                      (j == 6 ? "top_row" :  "__INVALID_NAME__")))))));
 
         std::string oldType = old_par->getOriginalType().getAsString();
         std::string newType = (t == 1 ? "hls::stream<InputStreamType>&" :
@@ -167,18 +169,14 @@ public:
 
 void add_include(std::string path);
 
+std::string thefile;
+
 class FunctionDeclFrontendAction : public clang::ASTFrontendAction
 {
-  std::string file;
 public:
   virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance& CI, clang::StringRef file) {
-    this->file = file.str();
+    thefile = file.str();
     return std::make_unique<FunctionDeclASTConsumer>(CI);
-  }
-
-  ~FunctionDeclFrontendAction()
-  {
-    add_include(file);
   }
 };
 
@@ -187,17 +185,20 @@ using namespace clang::tooling;
 
 int main(int argc, const char **argv)
 {
+    std::cout << "************** START PATCHING *****************\n";
+    {
 	llvm::cl::OptionCategory MyToolCategory("anyseq_hls_postproc options");
 	CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
 
-  std::stringstream ss;
-  std::streambuf* old = std::cout.rdbuf(ss.rdbuf());
+//  std::stringstream ss;
+//  std::streambuf* old = std::cout.rdbuf(ss.rdbuf());
 
 	ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
 	Tool.run(newFrontendActionFactory<FunctionDeclFrontendAction>().get());
 
-  std::cerr.rdbuf(old);
-  ss.str();
+//  std::cout.rdbuf(old);
+    }
+    add_include(thefile);
 
   return 0;
 }

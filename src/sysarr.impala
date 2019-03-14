@@ -40,7 +40,7 @@ struct DataVector {
 
 fn @create_data_vector1(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 1];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? complete dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -51,7 +51,7 @@ fn @create_data_vector1(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector2(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 2];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? complete dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -62,7 +62,7 @@ fn @create_data_vector2(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector4(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 4];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? complete dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -73,7 +73,7 @@ fn @create_data_vector4(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector8(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 8];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? complete dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -84,7 +84,7 @@ fn @create_data_vector8(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector16(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 16];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -95,7 +95,7 @@ fn @create_data_vector16(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector32(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 32];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -106,7 +106,7 @@ fn @create_data_vector32(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector64(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 64];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -117,7 +117,7 @@ fn @create_data_vector64(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector128(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 128];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -128,7 +128,7 @@ fn @create_data_vector128(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector256(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 256];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,
@@ -139,7 +139,7 @@ fn @create_data_vector256(init: DataVectorValueType) -> DataVector {
 
 fn @create_data_vector512(init: DataVectorValueType) -> DataVector {
   let mut array = [init, .. 512];
-    print_pragma("#pragma HLS ARRAY_PARTITION variable=?ARRAY NAME? block factor=?FACTOR? dim=1");
+    if(is_hls()) {  }
   DataVector {
     read:  @|i| array(i),
     write: @|i,v| array(i) = v,

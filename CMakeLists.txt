@@ -34,7 +34,7 @@ if(BACKEND STREQUAL "hls")
     endif()
 
     message(STATUS "Number of PEs: ${PE_COUNT}")
-    add_custom_target(mapping_fpga_pe_count ALL "${CMAKE_COMMAND}" -DPE_COUNT=${PE_COUNT} -P "${CMAKE_CURRENT_SOURCE_DIR}/src/write_pe_count.cmake")
+    add_custom_target(mapping_fpga_pe_count ALL "${CMAKE_COMMAND}" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DPE_COUNT=${PE_COUNT} -P "${CMAKE_CURRENT_SOURCE_DIR}/src/hls/write_pe_count.cmake" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/mapping_fpga_pe_count.impala)
 else()
     unset(HLS_PART CACHE)
     unset(ALIGN_SCHEME CACHE)
@@ -73,7 +73,7 @@ anydsl_runtime_wrap(ANYSEQ_PROGRAM FILES
     src/scoring.impala 
     src/traceback.impala 
     src/traceback_lintime.impala 
-    src/utils.impala
+    src/utils.impala # this needs to stay last or hls will break
     ) 
 
 add_executable(align 
@@ -81,36 +81,16 @@ add_executable(align
     src/alignment_io.cpp 
     src/sequence_io.cpp 
     ${ANYSEQ_PROGRAM})
+add_dependencies(align mapping_fpga_pe_count)
 
 target_link_libraries(align 
     ${ANYDSL_RUNTIME_LIBRARY} 
-    ${ANYDSL_RUNTIME_LIBRARIES})
+    ${ANYDSL_RUNTIME_LIBRARIES} -lOpenCL)
 
 set_target_properties(align PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED ON)
 
 if(BACKEND STREQUAL "hls")
-    # We assume align_postproc is already built for simplicity
-    add_custom_command(TARGET align POST_BUILD
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/hls_postproc/anyseq_hls_postproc ${CMAKE_CURRENT_BINARY_DIR}/utils_hls.cpp
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/src/hls/align_tb.cpp ${CMAKE_CURRENT_BINARY_DIR}/align_tb.cpp
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Patching HLS interface...")
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/hls/align.h.in ${CMAKE_CURRENT_BINARY_DIR}/align.h)
-
-    string(CONCAT custom_tcl_script "open_project anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}\n"
-                                    "set_top align\n"
-                                    "add_files utils_hls.cpp\n"
-                                    "add_files -tb align_tb.cpp\n"
-                                    "open_solution align_${PE_COUNT}\n"
-                                    "set lower ${HLS_PART}\n"
-                                    "set_part ${HLS_PART}\n"
-                                    "create_clock -period 6 -name default\n"
-                                    "csim_design -compiler clang -ldflags {-lrt} -clean\n"
-                                    "exit")
-    execute_process(COMMAND echo "${custom_tcl_script}" OUTPUT_FILE anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}.tcl)
-    add_custom_command(TARGET align POST_BUILD
-        COMMAND vivado_hls -f anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}.tcl
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Running vivado to setup anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}")
+    add_custom_target(hls_postproc ALL "${CMAKE_COMMAND}" -DALIGN_SCHEME=${ALIGN_SCHEME} -DHLS_PART=${HLS_PART} -DPE_COUNT=${PE_COUNT} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} -P "${CMAKE_CURRENT_SOURCE_DIR}/src/hls/postproc.cmake"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
