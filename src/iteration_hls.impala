@@ -29,8 +29,8 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
     // subjectt will contain a subject sequence letter and a column cell score
     //   subjectt[i] = sub_seq[i] << 16U | (left_col[i] & 0xFFFF);
     let subjectt = acc.alloc(1 * sizeof[i32]());
-    let subject_lenn = acc.alloc(2 * sizeof[Index]());
-    let querytt = acc.alloc(3 * sizeof[SequenceElem]());
+    let subject_lenn = acc.alloc(3 * sizeof[Index]());
+    let querytt = acc.alloc(2 * sizeof[SequenceElem]());
     let querytt_lenn = acc.alloc(4 * sizeof[Index]());
     let resultt = acc.alloc(6 * sizeof[Score]());
 
