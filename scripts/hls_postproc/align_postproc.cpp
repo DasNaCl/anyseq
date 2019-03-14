@@ -142,6 +142,8 @@ int main(int argc, const char **argv)
 	CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
 
 	ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
-	return Tool.run(newFrontendActionFactory<FunctionDeclFrontendAction>().get());
+	Tool.run(newFrontendActionFactory<FunctionDeclFrontendAction>().get());
+
+    return 0;
 }
 
