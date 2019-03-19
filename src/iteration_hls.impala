@@ -87,10 +87,15 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
           }
             if(i < subject_len) {
                 let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
-//                old_inputs.write(i % PE_COUNT, subc_buf_pair);
 
-                let subc = (subc_buf_pair >> 16) as SequenceElem;
-                let bufff = (subc_buf_pair << 16) >> 16;
+                fn @subc_buf_pair_to_subc(s: i32) -> SequenceElem {
+                  if !is_local() { (bitcast[u32](s) >> 24) as SequenceElem } else { (bitcast[u32](s) >> 16) as SequenceElem }
+                }
+                fn @subc_buf_pair_to_buf(s: i32) -> Score {
+                  if !is_local() { (s & 0xFFFFFF) as Score } else { (s & 0xFFFF) as Score }
+                }
+                let subc = subc_buf_pair_to_subc(subc_buf_pair);
+                let bufff = subc_buf_pair_to_buf(subc_buf_pair);
                 sub_acc.write(i, subc);
                 let s = subc;
                 sco_acc.update_begin_line(0, bufff);

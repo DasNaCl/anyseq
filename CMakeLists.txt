@@ -55,7 +55,7 @@ endif()
 
 if(DEVICE STREQUAL "fpga")
     set(DEVICE_FILES src/sysarr.impala src/iteration_hls.impala src/scoring_hls.impala src/mapping_fpga.impala src/mapping_fpga_pe_count.impala)
-    set(EXPORT_FILE src/export_hls_${ALIGN_SCHEME}.impala)
+    set(EXPORT_FILE src/export_hls_${ALIGN_SCHEME}.impala src/hls/scheme_${ALIGN_SCHEME}.impala)
 else()
     set(DEVICE_FILES src/iteration_${DEVICE}.impala src/mapping_${DEVICE}.impala src/scoring_${DEVICE}.impala)
     set(EXPORT_FILE src/export.impala)
