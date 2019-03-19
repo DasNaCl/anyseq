@@ -42,14 +42,14 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
         print_pragma("#pragma HLS INTERFACE axis off port=wbuff");
         print_pragma("#pragma HLS STREAM variable=wbuff dim=1");
         print_pragma("#pragma HLS INTERFACE s_axilite depth=?PE_COUNT? port=query bundle=CTRL");
+        if(is_global()) { print_pragma("#pragma HLS INTERFACE s_axilite depth=?PE_COUNT+1? port=top_row bundle=CTRL"); }
         print_pragma("#pragma HLS INTERFACE s_axilite register depth=1 port=subject_len bundle=CTRL");
         print_pragma("#pragma HLS INTERFACE s_axilite register depth=1 port=query_len bundle=CTRL");
         print_pragma("#pragma HLS INTERFACE s_axilite register depth=1 port=res bundle=CTRL");
         print_pragma("#pragma HLS INTERFACE s_axilite port=return bundle=CTRL");
 
         // some helper stuff. We have to modify the C code by hand later on, so we may as well make our life easier with dirty hacks
-        print_pragma("//OutputStreamType outstore;");
-        print_pragma("int tlast;");
+        print_pragma("//InputStreamType instore; InputStreamType outs[PE_COUNT]; OutputStreamType outstore;int tlast;");
         }
         let scoring = scheme.get_scoring(0, 0, scheme);
         let scores = scoring.get_scoring_matrix();
@@ -86,6 +86,7 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
           print_pragma("#pragma HLS LOOP_TRIPCOUNT min=4699745 max=4699762 avg=4699762");
           }
             if(i < subject_len) {
+                print_pragma("//instore = sub.read();\n//outs[lower_?????? % PE_COUNT] = instore;\n//_????? = instore.data;");
                 let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
 
                 fn @subc_buf_pair_to_subc(s: i32) -> SequenceElem {

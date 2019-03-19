@@ -144,14 +144,14 @@ fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScores
     
     if(read_mask & READ_TOP_ROW_FLAG == READ_TOP_ROW_FLAG) {
       let mut top_cur = olddata.read_top_row(0);
-      for pe in range(0, PE_COUNT) {
+      for pe in unroll(0, PE_COUNT) {
         let top_next = olddata.read_top_row(pe + 1);
         pe_scoring.write_hi_1j_1_old(pe, top_cur);
         pe_scoring.write_hij_1_old(pe, top_next);
         top_cur = top_next;
       }
     } else {
-      for pe in range(0, PE_COUNT) {
+      for pe in unroll(0, PE_COUNT) {
         pe_scoring.write_hi_1j_1_old(pe, 0 as Score);
         pe_scoring.write_hij_1_old(pe, 0 as Score);
       }
@@ -203,19 +203,18 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                   let hij_1_old = pe_line.get_hij_1_old(PE_COUNT - 1);
                   if(is_hls()) {
                   if(bufoff >= PE_COUNT - 1 || i + 1 >= 0) {
-                      print_pragma("tlast = 1;");
+                      print_pragma("//tlast = 1;");
                   } else {
-                      print_pragma("tlast = 0;");
+                      print_pragma("//tlast = 0;");
                   }
-                  print_pragma("//outstore.data = ?PATCH ME?;");
-                  print_pragma("//outstore.last = tlast;");
+                  print_pragma("//instore = outs[bufoff_??????];\n//outstore.data = ?PATCH ME?;\n//outstore.keep = instore.keep;\n//outstore.strb = instore.strb;\n//outstore.user = instore.user;\n//outstore.id = instore.id;\n//outstore.dest = instore.dest;\n//outstore.last = tlast;\n//wbuff.write(outstore);");
                   }
                   // we choose to use 0 by design! (will be patched)
                   olddata.write(0, hij_1_old);
               },
             block_begin:       |ql,q_acc| {
                 //readQuery
-                for pe in range(0, PE_COUNT){
+                for pe in unroll(0, PE_COUNT){
                     if(pe < ql) {
                       pe_line.write_degenerate(pe, 0 as i8);
                     }
@@ -265,7 +264,7 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
             update_end_line:   mat_acc.update_end_line,
             block_begin:       |a,b| {
                 mat_acc.block_begin(a,b);
-                for pe in range(0, PE_COUNT) {
+                for pe in unroll(0, PE_COUNT) {
                   max_scores.write_imaxi_1j(pe, 0 as Score);
                   max_scores.write_maxij_old(pe, 0 as Score);
                 }
@@ -315,7 +314,7 @@ fn get_semiglobal_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_s
             update_end_line:   mat_acc.update_end_line,
             block_begin:       |a,b| {
                 mat_acc.block_begin(a,b);
-                for pe in range(0, PE_COUNT) {
+                for pe in unroll(0, PE_COUNT) {
                   max_scores.write_imaxi_1j(pe, 0 as Score);
                   max_scores.write_maxij_old(pe, 0 as Score);
                 }
