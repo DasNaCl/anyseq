@@ -1,5 +1,5 @@
 
-#include "align.h"
+#include "align_${ALIGN_SCHEME}_${PE_COUNT}.h"
 
 #include <iostream>
 #include <sstream>
@@ -10,9 +10,7 @@
 const int query_len = 717;
 const int subject_len = 1031;
 
-// Unfortunately, this *must* be the same cost as specified in export.impala
-//  Otherwise, the test will fail
-#define MATCH       1
+#define MATCH       2
 #define MISMATCH   -1
 #define GAPPENALTY -1
 
@@ -171,5 +169,8 @@ int test()
 		return 0;
 	}
 }
+
+
+
 
 

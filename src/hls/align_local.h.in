@@ -12,10 +12,9 @@ const static unsigned int pe_count = PE_COUNT;
 
 typedef ap_axiu<16 + 8 + 8, 2, 5, 6> InputStreamType;
 
-typedef ap_axis<16 + 8 + 8, 2, 5, 6> OutputStreamType;
+typedef ap_axiu<16 + 8 + 8, 2, 5, 6> OutputStreamType;
 
 void align(hls::stream<InputStreamType>& sub, SequenceElem query[PE_COUNT], int subject_len, int query_len,
-		   hls::stream<OutputStreamType>& wbuff, ScoreType* res);
+		   hls::stream<OutputStreamType>& wbuff, int32_t* res);
 
 #endif
-
