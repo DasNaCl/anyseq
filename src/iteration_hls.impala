@@ -16,7 +16,7 @@ fn @create_iteration_info(result: Buffer, s_len: i32) -> IterationInfo {
       get_iai:   @|| iai_cpy,
       write_iai: @|v| iai_cpy = v,
       
-      write_result: @|v| bitcast[&mut[1][Score]](result.data)(0) = v,
+      write_result: @|v| bitcast[&mut[1][i32]](result.data)(0) = (v as i32),
 
       subject_len: s_len      
     }
@@ -32,7 +32,7 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
     let subject_lenn = acc.alloc(3 * sizeof[Index]());
     let querytt = acc.alloc(2 * sizeof[SequenceElem]());
     let querytt_lenn = acc.alloc(4 * sizeof[Index]());
-    let resultt = acc.alloc(6 * sizeof[Score]());
+    let resultt = acc.alloc(6 * sizeof[i32]());
 
     for work_item in acc.exec((1,1,1), (1,1,1)) {
         // IO specification  -  port names are post-patched, so we may hardcode them here....
@@ -86,17 +86,11 @@ fn @iteration(query_p: Sequence, subject_p: Sequence, fakescores: ScoringMatrix,
           print_pragma("#pragma HLS LOOP_TRIPCOUNT min=4699745 max=4699762 avg=4699762");
           }
             if(i < subject_len) {
-                print_pragma("//instore = sub.read();\n//outs[lower_?????? % PE_COUNT] = instore;\n//_????? = instore.data;");
+                print_pragma("//instore = sub.read();outs[lower_?????? % PE_COUNT] = instore;_????? = instore.data;");
                 let subc_buf_pair = bitcast[&[1][i32]](subjectt.data)(0); // <- done by design, will be post-patched
 
-                fn @subc_buf_pair_to_subc(s: i32) -> SequenceElem {
-                  if !is_local() { (bitcast[u32](s) >> 24) as SequenceElem } else { (bitcast[u32](s) >> 16) as SequenceElem }
-                }
-                fn @subc_buf_pair_to_buf(s: i32) -> Score {
-                  if !is_local() { (s & 0xFFFFFF) as Score } else { (s & 0xFFFF) as Score }
-                }
-                let subc = subc_buf_pair_to_subc(subc_buf_pair);
-                let bufff = subc_buf_pair_to_buf(subc_buf_pair);
+                let subc = (subc_buf_pair >> 16) as SequenceElem;
+                let bufff = (subc_buf_pair << 16) >> 16;
                 sub_acc.write(i, subc);
                 let s = subc;
                 sco_acc.update_begin_line(0, bufff);

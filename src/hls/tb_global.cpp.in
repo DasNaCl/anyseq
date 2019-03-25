@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <cassert>
 
-const int query_len = 171;
-const int subject_len = 301;
+const int query_len = 1701;
+const int subject_len = 885;
 
 #define MATCH       2
 #define MISMATCH   -1
@@ -22,12 +22,12 @@ const int subject_len = 301;
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-int w(char a, char b)
-{ return a == b ? MATCH : MISMATCH; }
+ScoreType w(char a, char b)
+{ return a == b ? ScoreType(MATCH) : ScoreType(MISMATCH); }
 
-int software_model(const std::string& subject, const std::string& query)
+ScoreType software_model(const std::string& subject, const std::string& query)
 {
-	int h[subject.size() + 1][query.size() + 1];
+	ScoreType h[subject.size() + 1][query.size() + 1];
 
 	// init
 	h[0][0] = 0;
@@ -39,8 +39,8 @@ int software_model(const std::string& subject, const std::string& query)
 	// solve recurrences
 	for(int i = 1; i <= subject.size(); ++i) {
 		for(int j = 1; j <= query.size(); ++j) {
-			const int diag = w(subject[i - 1], query[j - 1]) + h[i - 1][j - 1];
-			const int gap = GAPPENALTY + max(h[i - 1][j], h[i][j - 1]);
+			const ScoreType diag = w(subject[i - 1], query[j - 1]) + h[i - 1][j - 1];
+			const ScoreType gap = ScoreType(GAPPENALTY) + max(h[i - 1][j], h[i][j - 1]);
 
 			h[i][j] = max(diag, gap);
 		}
@@ -65,7 +65,7 @@ int test();
 int main()
 {
 	srand(1234561);
-	const int test_num = 16;
+	const int test_num = 32;
 
 	std::cout << "********** START TB **********\n";
 
@@ -123,7 +123,7 @@ int test()
 	 * HARDWARE
 	 */
 	// hardware only takes up to pe_count long queries, so we have to split that thing if it is longer
-	short hw = 0;
+	int32_t hw = 0;
 	int offset = 0;
 	hls::stream<OutputStreamType> wbuffer("wbuffer");
 	for(int i = 0; i < subject.size(); i++) {
@@ -132,7 +132,7 @@ int test()
 		out.data = (i + 1) * GAPPENALTY;
 		wbuffer.write(out);
 	}
-  std::vector<ScoreType> top_row;
+  std::vector<int16_t> top_row;
   top_row.resize(max(query.size(), PE_COUNT) + 1);
   top_row[0] = 0;
   for(int i = 1; i < top_row.size(); i++) {
@@ -145,11 +145,11 @@ int test()
 		hls::stream<InputStreamType> sub("sub");
 		for(int i = 0; i < subject.size(); i++) {
 			InputStreamType in;
-      in.data = (conv_subject[i] << 16) | (wbuffer.read().data & 0xFFFF);
+            in.data = (conv_subject[i] << 24) | (wbuffer.read().data & 0xFFFFFF);
 			sub.write(in);
 		}
-    assert(wbuffer.empty());
-		ScoreType local_result = 0;
+        assert(wbuffer.empty());
+		int32_t local_result = 0;
 		align(sub, &conv_query[offset], s_len, q_len, wbuffer, &local_result, &top_row[offset]);
 
 		hw = local_result;
@@ -160,7 +160,7 @@ int test()
 	/****
 	 * SOFTWARE
 	 */
-	short sw = software_model(subject, query);
+	int32_t sw = software_model(subject, query);
 
 	fail_prefix_stream << " HARDWARE [" << hw << "] vs. [" << sw << "] SOFTWARE\n";
 
@@ -174,8 +174,5 @@ int test()
 		return 0;
 	}
 }
-
-
-
 
 

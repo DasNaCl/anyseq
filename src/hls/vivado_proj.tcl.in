@@ -59,3 +59,4 @@ file copy -force ${BINARY_DIR}/vivado/anyseq_${ALIGN_SCHEME}_${PE_COUNT}_sysarr_
 
 launch_sdk -workspace ${BINARY_DIR}/vivado/anyseq_${ALIGN_SCHEME}_${PE_COUNT}_sysarr_hw/anyseq_${ALIGN_SCHEME}_${PE_COUNT}_sysarr_hw.sdk -hwspec ${BINARY_DIR}/vivado/anyseq_${ALIGN_SCHEME}_${PE_COUNT}_sysarr_hw/anyseq_${ALIGN_SCHEME}_${PE_COUNT}_sysarr_hw.sdk/sysarr_design_wrapper.hdf
 
+exit

@@ -28,35 +28,6 @@ public:
 		: sourceManager_(sm), rewriter_(r), parameterNames_()
 	{ }
 
-    /*
-  virtual clang::Expr* VisitUnaryOperator(clang::UnaryOperator* uop)
-  {
-    if (uop->getOpcode() == clang::UnaryOperatorKind::UO_Deref)
-    {
-      // check underlying declref
-      auto* under_expr = uop->getSubExpr();
-      if (clang::isa<clang::ImplicitCastExpr>(under_expr))
-      {
-        auto* deep_under_expr = clang::cast<clang::ImplicitCastExpr>(under_expr)->getSubExprAsWritten();
-        if (clang::isa<clang::DeclRefExpr>(deep_under_expr))
-        {
-          auto* expr = clang::cast<clang::DeclRefExpr>(deep_under_expr);
-          auto name = expr->getNameInfo().getName().getAsString();
-
-          if (parameterNames_.find(name) != parameterNames_.end())
-          {
-            std::string newName = parameterNames_[name];
-            std::cout << "\tRenaming: " << name << " -> " << newName << std::endl;
-
-            rewriter_.ReplaceText(expr->getNameInfo().getSourceRange(), newName + ".read()");
-          }
-        }
-      }
-    }
-    return uop;
-  }
-  */
-
   virtual clang::Expr* VisitDeclRefExpr(clang::DeclRefExpr* expr)
   {
     auto name = expr->getNameInfo().getName().getAsString();
@@ -87,6 +58,7 @@ public:
 			rewriter_.ReplaceText(func->getNameInfo().getSourceRange(), newFuncName);
 
       //sort params
+      bool global = false;
       std::size_t c = 0;
       std::vector<std::pair<std::uint64_t, std::size_t>> parms;
       for (clang::ParmVarDecl* param : func->parameters())
@@ -106,6 +78,7 @@ public:
                                 (arr_size == 5 ? "wbuff" :
                                 (arr_size == 6 ? "res" :
                                 (arr_size == 7 ? "top_row" :  "__INVALID_NAME__"))))))); 
+        global = global || arr_size == 7;
       }
       std::sort(parms.begin(), parms.end(), [](std::pair<std::uint64_t, std::size_t> a, std::pair<std::uint64_t, std::size_t> b)
                                             { return std::get<0>(a) < std::get<0>(b); });
@@ -136,8 +109,8 @@ public:
                               (t == 2 ? "SequenceElem" : //[PE_COUNT]
                               (t == 3 || t == 4 ? "int" :
                               (t == 5 ? "hls::stream<OutputStreamType>&" :
-                              (t == 6 ? "ScoreType*" :
-                              (t == 7 ? "ScoreType" /*[PE_COUNT]*/ : "__INVALID_TYPE__"))))));
+                              (t == 6 ? "int32_t*" :
+                              (t == 7 ? "int16_t" /*[PE_COUNT]*/ : "__INVALID_TYPE__"))))));
         std::cout << "Replacing: " << oldType << " -> " << newType << std::endl;
 
         std::string newDecl = newType + " " + newParName + (t != 2 && t != 7 ? "" : "[PE_COUNT]");

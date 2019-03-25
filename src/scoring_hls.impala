@@ -8,20 +8,22 @@ struct InitScoresAcc {
   read_top_row:      fn(Index) -> Score,
   write_top_row:     fn(Index, Score) -> (),
 
+  
+
   matches: MatchFn
 }
 fn @get_init_scores_acc(read: fn(Index) -> Score, write: fn(Index, Score) -> (), sc: ScoringScheme) -> InitScoresAcc{
     // we trick a bit by ignoring the argument functions (the PS provides init scores to PL, which we aren't modeling)
     let acc = accelerator(device_id);
     let left_column = acc.alloc(5 * sizeof[Score]());
-    let top_row = acc.alloc(7 * sizeof[Score]());
+    let top_row = acc.alloc(7 * sizeof[i16]());
     
     InitScoresAcc{
       read:  @(?i)|i|   bitcast[&[1][Score]](left_column.data)(i),
       write: @(?i)|i,v| bitcast[&mut[1][Score]](left_column.data)(i) = v,
 
-      read_top_row:      @(?i)|i|   bitcast[&[1][Score]](top_row.data)(i),
-      write_top_row:     @(?i)|i,v| bitcast[&mut[1][Score]](top_row.data)(i) = v,
+      read_top_row:      @(?i)|i|   (bitcast[&[1][i16]](top_row.data)(i)) as Score,
+      write_top_row:     @(?i)|i,v| undef[()](),
 
       matches: sc.matches
     }
@@ -33,10 +35,6 @@ fn @get_global_scoring_linmem(height: Index, width: Index, scheme: AlignmentSche
 }
 
 fn @get_semiglobal_scoring_linmem(height: Index, width: Index, scheme: AlignmentScheme) -> Scoring{
-    // the last row corresponds to the state a pe i is in after `subject_len + i` steps
-    // the last column corresponds to the stuff that was written to left_column (aka init_scores)
-    // We might be able to find the store using this information.
-
     let score_matrix = create_scoring_matrix_linmem(height, width, scheme.init_scores, 0);
     let maxs = create_maximums_array(PE_COUNT);
 
@@ -144,14 +142,14 @@ fn create_scoring_matrix_linmem(height: Index, width: Index, olddata: InitScores
     
     if(read_mask & READ_TOP_ROW_FLAG == READ_TOP_ROW_FLAG) {
       let mut top_cur = olddata.read_top_row(0);
-      for pe in unroll(0, PE_COUNT) {
+      for pe in range(0, PE_COUNT) {
         let top_next = olddata.read_top_row(pe + 1);
         pe_scoring.write_hi_1j_1_old(pe, top_cur);
         pe_scoring.write_hij_1_old(pe, top_next);
         top_cur = top_next;
       }
     } else {
-      for pe in unroll(0, PE_COUNT) {
+      for pe in range(0, PE_COUNT) {
         pe_scoring.write_hi_1j_1_old(pe, 0 as Score);
         pe_scoring.write_hij_1_old(pe, 0 as Score);
       }
@@ -207,14 +205,15 @@ fn get_linmem_iteration_acc_device(pe_line: ScoringArray, olddata: InitScoresAcc
                   } else {
                       print_pragma("//tlast = 0;");
                   }
-                  print_pragma("//instore = outs[bufoff_??????];\n//outstore.data = ?PATCH ME?;\n//outstore.keep = instore.keep;\n//outstore.strb = instore.strb;\n//outstore.user = instore.user;\n//outstore.id = instore.id;\n//outstore.dest = instore.dest;\n//outstore.last = tlast;\n//wbuff.write(outstore);");
+                  print_pragma("//instore = outs[bufoff_??????];outstore.data = ?PATCH ME?;outstore.keep = instore.keep;outstore.strb = instore.strb;outstore.user = instore.user;outstore.id = instore.id;outstore.dest = instore.dest;outstore.last = tlast;wbuff.write(outstore);");
                   }
                   // we choose to use 0 by design! (will be patched)
                   olddata.write(0, hij_1_old);
               },
             block_begin:       |ql,q_acc| {
                 //readQuery
-                for pe in unroll(0, PE_COUNT){
+                for pe in range(0, PE_COUNT){
+        print_pragma("#pragma HLS UNROLL");
                     if(pe < ql) {
                       pe_line.write_degenerate(pe, 0 as i8);
                     }
@@ -264,7 +263,8 @@ fn get_local_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_scores
             update_end_line:   mat_acc.update_end_line,
             block_begin:       |a,b| {
                 mat_acc.block_begin(a,b);
-                for pe in unroll(0, PE_COUNT) {
+                for pe in range(0, PE_COUNT) {
+        print_pragma("#pragma HLS LOOP_UNROLL");
                   max_scores.write_imaxi_1j(pe, 0 as Score);
                   max_scores.write_maxij_old(pe, 0 as Score);
                 }
@@ -288,35 +288,43 @@ fn get_semiglobal_linmem_iteration_acc_device(score_matrix: ScoringMatrix, max_s
             write:             |i,j,hij| {
                 mat_acc.write(i, j, hij);
 
-                let is_bottom = j - i >= it.subject_len;
                 /// rightmost column maximization must happen on PS!!
                 //let is_right  = i == PE_COUNT - 1 && j >= PE_COUNT - 1;
-                if(is_bottom) {
-                  let maxij = max(hij, max(max_scores.get_imaxi_1j(i), max_scores.get_maxij_old(i)));
-                  max_scores.write_maxij_old(i, maxij);
+                let tmpmax = max(max_scores.get_imaxi_1j(i), max_scores.get_maxij_old(i));
+                if((j as i32 - i as i32) >= (it.subject_len - 1)) {
+                    let maxij = max(hij, tmpmax);
+                    max_scores.write_maxij_old(i, maxij);
+                }
+                else {
+                    let maxij = max(max_scores.get_imaxi_1j(i), tmpmax);
+                    max_scores.write_maxij_old(i, maxij);
                 }
             },
             update_write:      |i| {
                 mat_acc.update_write(i);
                 if(i + 1 < PE_COUNT) {
-                    max_scores.write_imaxi_1j(i + 1, max_scores.get_maxij_old(i));
+//                    if(max_scores.get_degenerate(i) == 0 as Score) {
+                        max_scores.write_imaxi_1j(i + 1, max_scores.get_maxij_old(i));
+//                    }
+//                    else {
+//                        max_scores.write_imaxi_1j(i + 1, max_scores.get_imaxi_1j(i));
+//                    }
                 }
             },
-            update_begin_line: @(?k)|k,i| {
-                mat_acc.update_begin_line(k, i);
-                if(k == 1) {
-                    max_scores.write_imaxi_1j(0, 0 as Score);
-                }
-                else {
-                    max_scores.write_imaxi_1j(0, i as Score);
-                }
-            },
+            update_begin_line: mat_acc.update_begin_line,
             update_end_line:   mat_acc.update_end_line,
             block_begin:       |a,b| {
                 mat_acc.block_begin(a,b);
-                for pe in unroll(0, PE_COUNT) {
+                for pe in range(0, PE_COUNT) {
+            print_pragma("#pragma HLS LOOP_UNROLL");
                   max_scores.write_imaxi_1j(pe, 0 as Score);
                   max_scores.write_maxij_old(pe, 0 as Score);
+//                  if(pe < a) {
+//                      max_scores.write_degenerate(pe, 0 as Score);
+//                  }
+//                  else {
+//                      max_scores.write_degenerate(pe, 1 as Score);
+//                  }
                 }
             },
             block_end:         || {

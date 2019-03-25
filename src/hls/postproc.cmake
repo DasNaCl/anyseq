@@ -24,4 +24,6 @@ execute_process(COMMAND vivado_hls -f anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}.t
 execute_process(COMMAND vivado_hls -p anyseq_align_${ALIGN_SCHEME}_${PE_COUNT}
         WORKING_DIRECTORY ${BINARY_DIR})
 
-# ... we could go on here with further automation regarding hardware synthesis and driver code generation
+# synthesize hardware
+execute_process(COMMAND vivado -mode tcl -source ${BINARY_DIR}/vivado_${ALIGN_SCHEME}_${PE_COUNT}_proj.tcl
+    WORKING_DIRECTORY ${BINARY_DIR})

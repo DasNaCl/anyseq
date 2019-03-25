@@ -130,7 +130,7 @@ int test()
 	 * HARDWARE
 	 */
 	// hardware only takes up to pe_count long queries, so we have to split that thing if it is longer
-	short hw = -32768;
+	int32_t hw = -32768;
 	int offset = 0;
 	hls::stream<OutputStreamType> wbuffer("wbuffer");
 	for(int i = 0; i < subject.size(); i++) {
@@ -146,29 +146,30 @@ int test()
 		hls::stream<InputStreamType> sub("sub");
 		for(int i = 0; i < subject.size(); i++) {
 			InputStreamType in;
-      in.data = (conv_subject[i] << 16) | (wbuffer.read().data & 0xFFFF);
+            in.data = (conv_subject[i] << 16) | (wbuffer.read().data & 0xFFFF);
 			sub.write(in);
 		}
-    assert(wbuffer.empty());
-		ScoreType semi_result = 0;
+        assert(wbuffer.empty());
+		int32_t semi_result = 0;
 		align(sub, &conv_query[offset], s_len, q_len, wbuffer, &semi_result);
 
-    // collect maximum from bottom row
+        // collect maximum from bottom row
 		hw = max(hw, semi_result);
-    if((offset + PE_COUNT) >= query.size())
-    {
-      while(!wbuffer.empty()) {
-        ScoreType dat = (wbuffer.read().data & 0xFFFF);
+        if((offset + PE_COUNT) >= query.size())
+        {
+          while(!wbuffer.empty())
+          {
+            int32_t dat = (wbuffer.read().data);
 
-        hw = max(hw, dat);
-      }
-    }
+            hw = max(hw, dat);
+          }
+        }
 	} while((offset += pe_count) < query.size());
 
 	/****
 	 * SOFTWARE
 	 */
-	short sw = software_model(subject, query);
+	int32_t sw = software_model(subject, query);
 
 	fail_prefix_stream << " HARDWARE [" << hw << "] vs. [" << sw << "] SOFTWARE\n";
 
